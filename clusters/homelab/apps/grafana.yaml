@@ -39,6 +39,10 @@ spec:
                 access: proxy
                 url: http://vmsingle-victoria-metrics-single-server.spectra.svc:8428
                 isDefault: true
+              - name: Loki
+                type: loki
+                access: proxy
+                url: http://loki.spectra.svc:3100
         dashboardProviders:
           dashboardproviders.yaml:
             apiVersion: 1

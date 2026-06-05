@@ -1,0 +1,21 @@
+# Bridges decoded RF objects from MQTT into Loki.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devices-bridge
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/beladjioo/Spectra.git
+    targetRevision: main
+    path: apps/devices-bridge
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spectra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

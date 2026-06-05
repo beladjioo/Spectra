@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spectra-devices-bridge
+data:
+  # Subscribes to decoded RF objects on MQTT and pushes them to Loki as log lines
+  # (labels: job, sensor_id, kind). Grafana then shows them as a live table.
+  bridge.py: |
+    import json, os, time, urllib.request
+    import paho.mqtt.client as mqtt
+
+    MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto.spectra.svc")
+    MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+    LOKI = os.environ.get("LOKI_URL", "http://loki.spectra.svc:3100") + "/loki/api/v1/push"
+
+    def push(labels, line):
+        body = json.dumps({"streams": [{
+            "stream": labels,
+            "values": [[str(time.time_ns()), line]],
+        }]}).encode()
+        req = urllib.request.Request(LOKI, data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=5).read()
+        except Exception as e:  # noqa: BLE001
+            print("loki push failed:", e, flush=True)
+
+    def on_message(client, userdata, msg):
+        try:
+            payload = json.loads(msg.payload.decode(errors="ignore"))
+        except Exception:  # noqa: BLE001
+            return
+        decode = payload.get("decode", payload)
+        labels = {
+            "job": "spectra-devices",
+            "sensor_id": str(payload.get("sensor_id", "unknown")),
+            "kind": str(payload.get("kind", "unknown")),
+        }
+        # one compact JSON line per object so Grafana can parse fields from it
+        push(labels, json.dumps(decode, separators=(",", ":")))
+
+    cli = mqtt.Client(client_id="spectra-devices-bridge")
+    cli.on_message = on_message
+    cli.connect(MQTT_HOST, MQTT_PORT, 60)
+    cli.subscribe("spectra/+/devices")
+    print("devices-bridge: MQTT spectra/+/devices -> Loki", flush=True)
+    cli.loop_forever()
