@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telegraf-config
+data:
+  # Raw TOML — ordering is explicit and correct (the Helm chart's map->TOML
+  # rendering reordered keys and broke mqtt_consumer; we control it here).
+  telegraf.conf: |
+    [agent]
+      interval = "10s"
+      flush_interval = "10s"
+      omit_hostname = true
+
+    # Output: VictoriaMetrics speaks the InfluxDB line protocol on :8428.
+    [[outputs.influxdb]]
+      urls = ["http://vmsingle-victoria-metrics-single-server.spectra.svc:8428"]
+      database = "spectra"
+
+    # Input: subscribe to the edge agents' sweep stream and parse the JSON.
+    # (Device decode events on spectra/+/devices need their own json_v2 block —
+    #  TODO once we wire rtl_433 ingestion; kept out here to avoid parse errors.)
+    [[inputs.mqtt_consumer]]
+      servers = ["tcp://mosquitto.spectra.svc:1883"]
+      topics = ["spectra/+/sweep"]
+      data_format = "json_v2"
+
+      [[inputs.mqtt_consumer.json_v2]]
+        measurement_name = "rf_sweep"
+        timestamp_path = "ts"
+        timestamp_format = "unix"
+
+        [[inputs.mqtt_consumer.json_v2.tag]]
+          path = "sensor_id"
+
+        [[inputs.mqtt_consumer.json_v2.field]]
+          path = "noise_floor_db"
+        [[inputs.mqtt_consumer.json_v2.field]]
+          path = "peak_db"
+        [[inputs.mqtt_consumer.json_v2.field]]
+          path = "occupancy_ratio"
+        [[inputs.mqtt_consumer.json_v2.field]]
+          path = "interference"
+          type = "bool"
