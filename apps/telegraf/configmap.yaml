@@ -3,8 +3,6 @@ kind: ConfigMap
 metadata:
   name: telegraf-config
 data:
-  # Raw TOML — ordering is explicit and correct (the Helm chart's map->TOML
-  # rendering reordered keys and broke mqtt_consumer; we control it here).
   telegraf.conf: |
     [agent]
       interval = "10s"
@@ -12,26 +10,22 @@ data:
       omit_hostname = true
       debug = true
 
-    # Output: VictoriaMetrics speaks the InfluxDB line protocol on :8428.
     [[outputs.influxdb]]
       urls = ["http://vmsingle-victoria-metrics-single-server.spectra.svc:8428"]
       database = "spectra"
 
-    # Input: subscribe to the edge agents' sweep stream and parse the JSON.
     [[inputs.mqtt_consumer]]
       servers = ["tcp://mosquitto.spectra.svc:1883"]
       topics = ["spectra/+/sweep"]
       data_format = "json_v2"
 
-      # Block 1: scalar summary metrics -> measurement rf_sweep
+      # Block 1: scalar summary metrics -> rf_sweep_*
+      # No timestamp_path: Telegraf stamps at ingestion time (robust; the message
+      # "ts" field caused frozen/old timestamps).
       [[inputs.mqtt_consumer.json_v2]]
         measurement_name = "rf_sweep"
-        timestamp_path = "ts"
-        timestamp_format = "unix"
-
         [[inputs.mqtt_consumer.json_v2.tag]]
           path = "sensor_id"
-
         [[inputs.mqtt_consumer.json_v2.field]]
           path = "noise_floor_db"
         [[inputs.mqtt_consumer.json_v2.field]]
@@ -42,16 +36,11 @@ data:
           path = "interference"
           type = "bool"
 
-      # Block 2: per-frequency-bin power -> measurement rf_spectrum, one series
-      # per (sensor_id, freq_mhz). This feeds the Grafana waterfall/heatmap.
+      # Block 2: per-frequency-bin power -> rf_spectrum_power_db{freq_mhz}
       [[inputs.mqtt_consumer.json_v2]]
         measurement_name = "rf_spectrum"
-        timestamp_path = "ts"
-        timestamp_format = "unix"
-
         [[inputs.mqtt_consumer.json_v2.tag]]
           path = "sensor_id"
-
         [[inputs.mqtt_consumer.json_v2.object]]
           path = "bins"
           tags = ["freq_mhz"]
