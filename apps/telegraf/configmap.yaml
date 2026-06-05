@@ -50,3 +50,20 @@ data:
         [[inputs.mqtt_consumer.json_v2.object]]
           path = "bins"
           tags = ["freq_mhz"]
+
+    # Input C: live agent status -> spectra_status_center_mhz{sensor_id}
+    # Single series per sensor (value = current band centre) so the UI always
+    # shows the CURRENT mode. Value-mapped to a label in Grafana.
+    [[inputs.mqtt_consumer]]
+      servers = ["tcp://mosquitto.spectra.svc:1883"]
+      client_id = "telegraf-status"
+      topics = ["spectra/+/status"]
+      data_format = "json_v2"
+      [[inputs.mqtt_consumer.json_v2]]
+        measurement_name = "spectra_status"
+        [[inputs.mqtt_consumer.json_v2.tag]]
+          path = "sensor_id"
+        [[inputs.mqtt_consumer.json_v2.field]]
+          path = "center_mhz"
+        [[inputs.mqtt_consumer.json_v2.field]]
+          path = "active"

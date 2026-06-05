@@ -21,12 +21,38 @@
   },
   "panels": [
     {
+      "title": "Active mode",
+      "type": "stat",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "spectra_status_center_mhz{sensor_id=~\"$sensor\"}", "instant": true, "legendFormat": "" }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value", "colorMode": "background", "graphMode": "none", "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": {
+              "98": { "text": "📻 FM 88-108", "index": 0, "color": "blue" },
+              "866.5": { "text": "📡 868 ISM", "index": 1, "color": "blue" },
+              "2441.5": { "text": "📶 2.4 GHz WiFi/BT", "index": 2, "color": "purple" },
+              "433.92": { "text": "🌡️ Weather 433", "index": 3, "color": "green" },
+              "868.3": { "text": "🌡️ Weather 868", "index": 4, "color": "orange" }
+            }}
+          ],
+          "noValue": "idle",
+          "color": { "mode": "fixed", "fixedColor": "text" }
+        }
+      }
+    },
+    {
       "title": "HackRF mode — click to retune the radio",
       "type": "text",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 18, "x": 6, "y": 0 },
       "options": {
         "mode": "html",
-        "content": "<iframe name=\"ctl\" style=\"display:none\"></iframe><div style=\"display:flex;gap:14px;align-items:center;height:100%;padding:6px 4px;font-family:sans-serif\"><span style=\"color:#9aa;margin-right:4px\">HackRF&nbsp;:</span><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=sweep\" target=\"ctl\" style=\"background:#1f60c4;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600\">📡 Sweep 868</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=weather433\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600\">🌡️ Weather 433</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=weather868\" target=\"ctl\" style=\"background:#8a6d0b;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600\">🌡️ Weather 868</a></div>"
+        "content": "<iframe name=\"ctl\" style=\"display:none\"></iframe><div style=\"display:flex;flex-wrap:wrap;gap:10px;align-items:center;height:100%;padding:6px 4px;font-family:sans-serif\"><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=sweep868\" target=\"ctl\" style=\"background:#1f60c4;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none;font-weight:600\">📡 Sweep 868</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=sweepfm\" target=\"ctl\" style=\"background:#5a3fc0;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none;font-weight:600\">📻 Sweep FM</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=sweep24\" target=\"ctl\" style=\"background:#7a3f9c;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none;font-weight:600\">📶 Sweep 2.4 GHz</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=weather433\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none;font-weight:600\">🌡️ Weather 433</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=weather868\" target=\"ctl\" style=\"background:#8a6d0b;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none;font-weight:600\">🌡️ Weather 868</a></div>"
       }
     },
     {
@@ -61,7 +87,7 @@
       "title": "Waterfall — power per frequency bin (dB)  [select ONE sensor]",
       "type": "heatmap",
       "datasource": "VictoriaMetrics",
-      "description": "Spectrogram: frequency (Y) over time (X), colour = power. Pick a single sensor.",
+      "description": "Spectrogram: frequency (Y) over time (X), colour = power. Pick a single sensor. Y axis adapts to the band you are sweeping.",
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 26 },
       "targets": [
         { "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"}", "legendFormat": "{{freq_mhz}}", "format": "time_series", "range": true }

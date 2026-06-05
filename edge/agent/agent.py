@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Spectra edge agent v2 — mode supervisor.
+"""Spectra edge agent v3 — mode supervisor with band sweeps + live status.
 
-A single HackRF can only listen to one band at a time, so the agent runs ONE
-"mode" at a time and switches on command:
+A single HackRF listens to one band at a time, so the agent runs ONE "mode" and
+switches on command (retained MQTT message spectra/<sensor>/mode):
 
-  - sweep   : hackrf_sweep across the ISM band -> spectra/<sensor>/sweep
-  - weather : rtl_433 @433.92 MHz decoding sensors -> spectra/<sensor>/devices
-  - (adsb)  : added in a later phase
+  sweep868   : hackrf_sweep 863-870 MHz   (ISM)
+  sweepfm    : hackrf_sweep 88-108 MHz    (FM broadcast — strong, great with a long whip)
+  sweep24    : hackrf_sweep 2400-2483 MHz (WiFi / Bluetooth / microwave oven)
+  weather433 : rtl_433 @433.92 MHz        (sensors -> spectra/<sensor>/devices)
+  weather868 : rtl_433 @868.30 MHz
 
-The desired mode is read from a retained MQTT message on spectra/<sensor>/mode
-(published by the spectra-control service, which the Grafana buttons call). On a
-mode change the agent stops the current worker (releasing the HackRF) and starts
-the new one. It publishes its active mode on spectra/<sensor>/status (retained)
-so the UI can show what's running.
+It publishes its active mode every few seconds on spectra/<sensor>/status (retained)
+with a human band label, so the UI can show what the radio is doing right now.
 
 Everything is receive-only. Nothing is transmitted.
 """
@@ -34,9 +33,6 @@ import yaml
 log = logging.getLogger("spectra.agent")
 
 
-# --------------------------------------------------------------------------- #
-# Config
-# --------------------------------------------------------------------------- #
 @dataclass
 class Config:
     sensor_id: str = "sensor-unknown"
@@ -44,18 +40,13 @@ class Config:
     mqtt_port: int = 1883
     mqtt_tls: bool = False
     topic_prefix: str = "spectra"
-    default_mode: str = "sweep"
-    # sweep params
-    sweep_freq_min_mhz: int = 863
-    sweep_freq_max_mhz: int = 870
+    default_mode: str = "sweep868"
     sweep_bin_width_hz: int = 100_000
     sweep_lna_gain: int = 32
     sweep_vga_gain: int = 20
     sweep_interval_s: float = 5.0
     noise_floor_dbm_threshold: float = -65.0
-    # weather (rtl_433) params
     weather_device: str = "soapy:driver=hackrf"
-    weather_frequency: str = "433.92M"
     weather_sample_rate: str = "250k"
 
     @classmethod
@@ -70,12 +61,11 @@ class Config:
 
 
 # --------------------------------------------------------------------------- #
-# Workers — each owns the HackRF while its mode is active
+# Workers
 # --------------------------------------------------------------------------- #
 class Worker:
-    """Base worker: runs a subprocess and a reader thread until stopped."""
-
-    name = "base"
+    band_label = "?"
+    center_mhz = 0.0
 
     def __init__(self, cfg: Config, publish: Callable[[str, dict[str, Any]], None]):
         self.cfg = cfg
@@ -85,7 +75,7 @@ class Worker:
 
     def start(self) -> None:
         self._stop.clear()
-        self._thread = threading.Thread(target=self._run, name=self.name, daemon=True)
+        self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -93,12 +83,19 @@ class Worker:
         if self._thread:
             self._thread.join(timeout=8)
 
-    def _run(self) -> None:  # pragma: no cover - overridden
+    def _run(self) -> None:  # pragma: no cover
         raise NotImplementedError
 
 
 class SweepWorker(Worker):
-    name = "sweep"
+    def __init__(self, cfg, publish, fmin_mhz: int, fmax_mhz: int, label: str,
+                 bin_width_hz: int | None = None):
+        super().__init__(cfg, publish)
+        self.fmin = fmin_mhz
+        self.fmax = fmax_mhz
+        self.band_label = label
+        self.center_mhz = round((fmin_mhz + fmax_mhz) / 2, 2)
+        self.bin_width = bin_width_hz or cfg.sweep_bin_width_hz
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -107,20 +104,17 @@ class SweepWorker(Worker):
                 self._one_sweep()
             except FileNotFoundError:
                 log.error("hackrf_sweep not found"); self._stop.wait(30)
-            except Exception:  # noqa: BLE001 - keep the edge loop alive
+            except Exception:  # noqa: BLE001
                 log.exception("sweep failed")
             self._stop.wait(max(0.0, self.cfg.sweep_interval_s - (time.time() - started)))
 
     def _one_sweep(self) -> None:
         cmd = [
-            "hackrf_sweep",
-            "-f", f"{self.cfg.sweep_freq_min_mhz}:{self.cfg.sweep_freq_max_mhz}",
-            "-w", str(self.cfg.sweep_bin_width_hz),
-            "-l", str(self.cfg.sweep_lna_gain),
-            "-g", str(self.cfg.sweep_vga_gain),
-            "-1",
+            "hackrf_sweep", "-f", f"{self.fmin}:{self.fmax}",
+            "-w", str(self.bin_width),
+            "-l", str(self.cfg.sweep_lna_gain), "-g", str(self.cfg.sweep_vga_gain), "-1",
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
         bins: list[dict[str, float]] = []
         powers: list[float] = []
         for line in proc.stdout.splitlines():
@@ -142,9 +136,8 @@ class SweepWorker(Worker):
         noise_floor = ps[len(ps) // 10]
         occupied = sum(1 for p in powers if p > self.cfg.noise_floor_dbm_threshold)
         self.publish("sweep", {
-            "band_mhz": [self.cfg.sweep_freq_min_mhz, self.cfg.sweep_freq_max_mhz],
-            "noise_floor_db": round(noise_floor, 2),
-            "peak_db": round(ps[-1], 2),
+            "band_mhz": [self.fmin, self.fmax], "band_label": self.band_label,
+            "noise_floor_db": round(noise_floor, 2), "peak_db": round(ps[-1], 2),
             "occupancy_ratio": round(occupied / len(powers), 4),
             "interference": noise_floor > self.cfg.noise_floor_dbm_threshold,
             "bins": bins,
@@ -152,24 +145,15 @@ class SweepWorker(Worker):
 
 
 class WeatherWorker(Worker):
-    """rtl_433: decodes weather stations and 433/868 sensors at a given frequency."""
-
-    name = "weather"
-
-    def __init__(self, cfg: Config, publish: Callable[[str, dict[str, Any]], None],
-                 frequency: str | None = None, band_mhz: float | None = None):
+    def __init__(self, cfg, publish, frequency: str, band_mhz: float):
         super().__init__(cfg, publish)
-        self.frequency = frequency or cfg.weather_frequency
-        self.band_mhz = band_mhz if band_mhz is not None else 433.92
+        self.frequency = frequency
+        self.center_mhz = band_mhz
+        self.band_label = f"Weather {band_mhz:g} MHz (rtl_433)"
 
     def _run(self) -> None:
-        cmd = [
-            "rtl_433",
-            "-d", self.cfg.weather_device,
-            "-f", self.frequency,
-            "-s", self.cfg.weather_sample_rate,
-            "-F", "json", "-M", "level",
-        ]
+        cmd = ["rtl_433", "-d", self.cfg.weather_device, "-f", self.frequency,
+               "-s", self.cfg.weather_sample_rate, "-F", "json", "-M", "level"]
         while not self._stop.is_set():
             try:
                 log.info("starting rtl_433: %s", " ".join(cmd))
@@ -185,7 +169,7 @@ class WeatherWorker(Worker):
                         event = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    self.publish("devices", {"kind": "weather", "band_mhz": self.band_mhz,
+                    self.publish("devices", {"kind": "weather", "band_mhz": self.center_mhz,
                                              "decode": event})
                 proc.terminate()
                 try:
@@ -198,17 +182,20 @@ class WeatherWorker(Worker):
                 log.exception("rtl_433 failed; retry in 5s"); self._stop.wait(5)
 
 
-# mode name -> factory(cfg, publish) -> Worker. Add new bands/decoders here.
 WORKERS: dict[str, Callable[[Config, Callable[[str, dict[str, Any]], None]], Worker]] = {
-    "sweep": lambda c, p: SweepWorker(c, p),
+    "sweep868":  lambda c, p: SweepWorker(c, p, 863, 870, "868 ISM (863-870 MHz)"),
+    "sweepfm":   lambda c, p: SweepWorker(c, p, 88, 108, "FM radio (88-108 MHz)"),
+    "sweep24":   lambda c, p: SweepWorker(c, p, 2400, 2483, "2.4 GHz WiFi/BT", 1_000_000),
     "weather433": lambda c, p: WeatherWorker(c, p, "433.92M", 433.92),
     "weather868": lambda c, p: WeatherWorker(c, p, "868.3M", 868.3),
-    "weather": lambda c, p: WeatherWorker(c, p, "433.92M", 433.92),  # backward alias
+    # backward aliases
+    "sweep": lambda c, p: SweepWorker(c, p, 863, 870, "868 ISM (863-870 MHz)"),
+    "weather": lambda c, p: WeatherWorker(c, p, "433.92M", 433.92),
 }
 
 
 # --------------------------------------------------------------------------- #
-# Agent — MQTT + mode supervision
+# Agent
 # --------------------------------------------------------------------------- #
 @dataclass
 class Agent:
@@ -236,11 +223,9 @@ class Agent:
         payload.setdefault("ts", time.time())
         self.client.publish(topic, json.dumps(payload), qos=0)
 
-    # ---- MQTT callbacks --------------------------------------------------- #
     def _on_connect(self, client, userdata, flags, rc, *args) -> None:
         log.info("connected to mqtt (rc=%s); subscribing to %s", rc, self._mode_topic)
         client.subscribe(self._mode_topic)
-        # if nobody has set a mode yet, fall back to the default
         if not self._mode:
             self.set_mode(self.cfg.default_mode)
 
@@ -252,7 +237,6 @@ class Agent:
             mode = raw
         self.set_mode(mode)
 
-    # ---- mode switching --------------------------------------------------- #
     def set_mode(self, mode: str) -> None:
         mode = (mode or "").strip()
         if mode not in WORKERS:
@@ -265,7 +249,7 @@ class Agent:
                 log.info("stopping mode %s", self._mode)
                 self._current.stop()
                 self._current = None
-                time.sleep(1.0)  # let the HackRF be released
+                time.sleep(1.0)
             log.info("starting mode %s", mode)
             self._current = WORKERS[mode](self.cfg, self.publish)
             self._current.start()
@@ -273,18 +257,27 @@ class Agent:
         self._publish_status()
 
     def _publish_status(self) -> None:
+        w = self._current
         topic = f"{self.cfg.topic_prefix}/{self.cfg.sensor_id}/status"
         self.client.publish(topic, json.dumps({
             "sensor_id": self.cfg.sensor_id, "mode": self._mode,
-            "available_modes": list(WORKERS), "ts": time.time(),
+            "band_label": w.band_label if w else "idle",
+            "center_mhz": w.center_mhz if w else 0,
+            "active": 1, "ts": time.time(),
         }), qos=0, retain=True)
 
-    # ---- lifecycle -------------------------------------------------------- #
+    def _heartbeat(self) -> None:
+        while not self._stop.is_set():
+            if self._mode:
+                self._publish_status()
+            self._stop.wait(10)
+
     def run(self) -> None:
         log.info("connecting to mqtt %s:%s", self.cfg.mqtt_host, self.cfg.mqtt_port)
         self.client.connect(self.cfg.mqtt_host, self.cfg.mqtt_port, keepalive=60)
         self.client.loop_start()
-        log.info("spectra agent v2 running as %s", self.cfg.sensor_id)
+        threading.Thread(target=self._heartbeat, daemon=True).start()
+        log.info("spectra agent v3 running as %s", self.cfg.sensor_id)
         while not self._stop.is_set():
             time.sleep(1)
         if self._current:
