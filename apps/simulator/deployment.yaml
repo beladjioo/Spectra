@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spectra-simulator
+  labels:
+    app.kubernetes.io/name: spectra-simulator
+    app.kubernetes.io/part-of: spectra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spectra-simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spectra-simulator
+    spec:
+      containers:
+        - name: simulator
+          image: python:3.12-slim
+          # No custom image / registry needed: install the one dep at startup,
+          # then run the mounted script.
+          command: ["/bin/sh", "-c"]
+          args:
+            - pip install --quiet --root-user-action=ignore paho-mqtt && exec python /app/simulate.py
+          env:
+            - { name: SIM_MQTT_HOST, value: "mosquitto.spectra.svc" }
+            - { name: SIM_MQTT_PORT, value: "1883" }
+            - { name: SIM_SENSORS, value: "paris-13-rooftop,paris-11-relay,lyon-quai" }
+            - { name: SIM_INTERVAL, value: "5" }
+            - { name: SIM_THRESHOLD, value: "-65" }
+          volumeMounts:
+            - name: script
+              mountPath: /app
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+      volumes:
+        - name: script
+          configMap:
+            name: spectra-simulator
