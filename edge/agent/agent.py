@@ -152,15 +152,21 @@ class SweepWorker(Worker):
 
 
 class WeatherWorker(Worker):
-    """rtl_433 @433.92 MHz: decodes weather stations and 433/868 sensors."""
+    """rtl_433: decodes weather stations and 433/868 sensors at a given frequency."""
 
     name = "weather"
+
+    def __init__(self, cfg: Config, publish: Callable[[str, dict[str, Any]], None],
+                 frequency: str | None = None, band_mhz: float | None = None):
+        super().__init__(cfg, publish)
+        self.frequency = frequency or cfg.weather_frequency
+        self.band_mhz = band_mhz if band_mhz is not None else 433.92
 
     def _run(self) -> None:
         cmd = [
             "rtl_433",
             "-d", self.cfg.weather_device,
-            "-f", self.cfg.weather_frequency,
+            "-f", self.frequency,
             "-s", self.cfg.weather_sample_rate,
             "-F", "json", "-M", "level",
         ]
@@ -179,7 +185,7 @@ class WeatherWorker(Worker):
                         event = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    self.publish("devices", {"kind": "weather", "band_mhz": 433.92,
+                    self.publish("devices", {"kind": "weather", "band_mhz": self.band_mhz,
                                              "decode": event})
                 proc.terminate()
                 try:
@@ -192,9 +198,12 @@ class WeatherWorker(Worker):
                 log.exception("rtl_433 failed; retry in 5s"); self._stop.wait(5)
 
 
-WORKERS: dict[str, type[Worker]] = {
-    "sweep": SweepWorker,
-    "weather": WeatherWorker,
+# mode name -> factory(cfg, publish) -> Worker. Add new bands/decoders here.
+WORKERS: dict[str, Callable[[Config, Callable[[str, dict[str, Any]], None]], Worker]] = {
+    "sweep": lambda c, p: SweepWorker(c, p),
+    "weather433": lambda c, p: WeatherWorker(c, p, "433.92M", 433.92),
+    "weather868": lambda c, p: WeatherWorker(c, p, "868.3M", 868.3),
+    "weather": lambda c, p: WeatherWorker(c, p, "433.92M", 433.92),  # backward alias
 }
 
 
