@@ -75,7 +75,7 @@
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
       "targets": [
         {
-          "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"} + 120",
+          "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"}",
           "legendFormat": "{{freq_mhz}}",
           "format": "time_series",
           "range": true
@@ -93,8 +93,8 @@
           "mode": "scheme",
           "scheme": "Turbo",
           "steps": 64,
-          "min": 20,
-          "max": 85,
+          "min": -95,
+          "max": -35,
           "reverse": false
         },
         "yAxis": {
