@@ -1,0 +1,71 @@
+{
+  "title": "Spectra — ISM Health",
+  "uid": "spectra-ism-health",
+  "tags": ["spectra", "rf", "iot"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-3h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "sensor",
+        "type": "query",
+        "datasource": "VictoriaMetrics",
+        "query": "label_values(rf_sweep_noise_floor_db, sensor_id)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Noise floor (dB)",
+      "type": "timeseries",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rf_sweep_noise_floor_db{sensor_id=~\"$sensor\"}",
+          "legendFormat": "{{sensor_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Band occupancy ratio",
+      "type": "timeseries",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rf_sweep_occupancy_ratio{sensor_id=~\"$sensor\"}",
+          "legendFormat": "{{sensor_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Interference flag",
+      "type": "state-timeline",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rf_sweep_interference{sensor_id=~\"$sensor\"}",
+          "legendFormat": "{{sensor_id}}"
+        }
+      ]
+    },
+    {
+      "title": "Peak power (dB)",
+      "type": "timeseries",
+      "datasource": "VictoriaMetrics",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "expr": "rf_sweep_peak_db{sensor_id=~\"$sensor\"}",
+          "legendFormat": "{{sensor_id}}"
+        }
+      ]
+    }
+  ]
+}

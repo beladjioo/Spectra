@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spectra-agent-config
+  namespace: spectra-edge
+data:
+  config.yaml: |
+    # sensor_id is overridden by SPECTRA_SENSOR_ID (the node name) in the DaemonSet.
+    mqtt_host: mqtt.spectra.example.com   # TODO: your central cluster's MQTT endpoint
+    mqtt_port: 8883
+    mqtt_tls: true
+    topic_prefix: spectra
+
+    sweep_freq_min_mhz: 863
+    sweep_freq_max_mhz: 870
+    sweep_bin_width_hz: 100000
+    sweep_lna_gain: 32
+    sweep_vga_gain: 20
+    sweep_interval_s: 5.0
+
+    rtl433_enabled: true
+    rtl433_device: "soapy:driver=hackrf"
+    rtl433_frequency: "868.3M"
+    rtl433_sample_rate: "1024k"
+
+    noise_floor_dbm_threshold: -65.0

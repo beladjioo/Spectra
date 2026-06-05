@@ -1,0 +1,22 @@
+# MQTT broker — the bus between edge sensors and the cluster. Deployed from local
+# kustomize (apps/mosquitto) so we control auth/listener config in git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mosquitto
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CHANGEME/spectra.git   # TODO: your repo URL
+    targetRevision: main
+    path: apps/mosquitto
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spectra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

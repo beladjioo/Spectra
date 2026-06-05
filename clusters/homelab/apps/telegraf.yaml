@@ -1,0 +1,54 @@
+# Ingest: subscribe to MQTT, parse the agent's JSON, write to VictoriaMetrics via
+# the InfluxDB line protocol. This is the bridge between the RF edge and storage.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: telegraf
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.influxdata.com/
+    chart: telegraf
+    targetRevision: 1.8.*
+    helm:
+      releaseName: telegraf
+      values: |
+        config:
+          agent:
+            interval: "10s"
+            flush_interval: "10s"
+          outputs:
+            - influxdb:
+                urls:
+                  - "http://vmsingle-victoria-metrics-single-server.spectra.svc:8428"
+                database: spectra
+          inputs:
+            - mqtt_consumer:
+                servers:
+                  - "tcp://mosquitto.spectra.svc:1883"
+                topics:
+                  - "spectra/+/sweep"
+                  - "spectra/+/devices"
+                data_format: "json_v2"
+                json_v2:
+                  - measurement_name: "rf_sweep"
+                    timestamp_path: "ts"
+                    timestamp_format: "unix"
+                    tag:
+                      - path: "sensor_id"
+                    field:
+                      - path: "noise_floor_db"
+                      - path: "peak_db"
+                      - path: "occupancy_ratio"
+                      - path: "interference"
+                        type: "bool"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spectra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

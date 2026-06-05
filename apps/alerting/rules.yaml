@@ -1,0 +1,46 @@
+# vmalert rules. Mounted by vmalert (enable it in the victoriametrics chart values,
+# or run vmalert standalone). These encode the MVP value proposition.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spectra-alert-rules
+  labels:
+    spectra.io/vmalert: "true"
+data:
+  spectra.rules.yaml: |
+    groups:
+      - name: spectra-ism
+        rules:
+          - alert: ISMInterferenceSustained
+            expr: rf_sweep_interference == 1
+            for: 5m
+            labels:
+              severity: warning
+              domain: rf
+            annotations:
+              summary: "Sustained ISM interference on {{ $labels.sensor_id }}"
+              description: >
+                Noise floor has exceeded the interference threshold for 5+ minutes.
+                Co-located LoRaWAN/SRD devices may be failing to transmit.
+
+          - alert: NoiseFloorRising
+            expr: >
+              rf_sweep_noise_floor_db
+                - avg_over_time(rf_sweep_noise_floor_db[1h] offset 1h) > 6
+            for: 10m
+            labels:
+              severity: info
+              domain: rf
+            annotations:
+              summary: "Noise floor up >6 dB vs last hour on {{ $labels.sensor_id }}"
+              description: "Emerging interference source or environmental change."
+
+          - alert: SensorSilent
+            expr: absent_over_time(rf_sweep_noise_floor_db[10m])
+            for: 0m
+            labels:
+              severity: critical
+              domain: fleet
+            annotations:
+              summary: "Spectra sensor stopped reporting"
+              description: "No sweep data for 10 minutes — check the edge agent / HackRF."

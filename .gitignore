@@ -1,0 +1,29 @@
+# Secrets — never commit real values
+*.secret.yaml
+*-secret.yaml
+secrets/
+.env
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Captures / RF data (can be huge)
+*.cf32
+*.iq
+*.wav
+captures/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Helm / k8s
+charts/*.tgz
+kubeconfig

@@ -1,0 +1,50 @@
+# Dashboards. Datasource is pre-wired to VictoriaMetrics (Prometheus-compatible).
+# A starter "ISM Health" dashboard is provisioned from a ConfigMap (see apps/grafana/).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    targetRevision: 8.*
+    helm:
+      releaseName: grafana
+      values: |
+        admin:
+          existingSecret: spectra-grafana-admin   # TODO: create via sealed-secrets
+        persistence:
+          enabled: true
+          size: 5Gi
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: VictoriaMetrics
+                type: prometheus
+                access: proxy
+                url: http://vmsingle-victoria-metrics-single-server.spectra.svc:8428
+                isDefault: true
+        dashboardProviders:
+          dashboardproviders.yaml:
+            apiVersion: 1
+            providers:
+              - name: spectra
+                folder: Spectra
+                type: file
+                options:
+                  path: /var/lib/grafana/dashboards/spectra
+        dashboardsConfigMaps:
+          spectra: spectra-dashboards
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spectra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
