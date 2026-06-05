@@ -105,6 +105,15 @@
         "tooltip": { "show": true, "yHistogram": false },
         "legend": { "show": false }
       }
+    },
+    {
+      "title": "📻 FM Radio — live audio (1: pick a station, 2: press ▶ Play)",
+      "type": "text",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 38 },
+      "options": {
+        "mode": "html",
+        "content": "<iframe name=\"ctl\" style=\"display:none\"></iframe><div style=\"font-family:sans-serif;padding:8px 4px\"><div style=\"color:#9aa;margin-bottom:8px\">1) clique une station &nbsp;&rarr;&nbsp; 2) appuie sur &#9654; dans le lecteur (re-appuie si tu changes de station)</div><div style=\"display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px\"><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=listenfm:100.0\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">100.0</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=listenfm:96.0\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">96.0</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=listenfm:94.9\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">94.9</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=listenfm:98.3\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">98.3</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=listenfm:91.1\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">91.1</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=listenfm:88.1\" target=\"ctl\" style=\"background:#37872d;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">88.1</a><a href=\"http://192.168.1.55:30890/?sensor=jetson-desktop&mode=sweep868\" target=\"ctl\" style=\"background:#777;color:#fff;padding:8px 14px;border-radius:6px;text-decoration:none;font-weight:600\">&#9209; Stop</a></div><audio controls preload=\"none\" style=\"width:100%;max-width:520px\" src=\"http://192.168.1.55:30900/fm.mp3\"></audio></div>"
+      }
     }
   ]
 }
