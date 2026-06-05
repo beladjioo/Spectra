@@ -150,6 +150,22 @@ class WeatherWorker(Worker):
         self.frequency = frequency
         self.center_mhz = band_mhz
         self.band_label = f"Weather {band_mhz:g} MHz (rtl_433)"
+        self.proc: subprocess.Popen | None = None
+
+    def stop(self) -> None:
+        # rtl_433 may be silent (no devices -> blocked on stdout read), so the
+        # reader thread won't notice _stop. Kill the subprocess to unblock it AND
+        # release the HackRF, otherwise the next mode gets "Resource busy".
+        self._stop.set()
+        p = self.proc
+        if p and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        if self._thread:
+            self._thread.join(timeout=8)
 
     def _run(self) -> None:
         cmd = ["rtl_433", "-d", self.cfg.weather_device, "-f", self.frequency,
@@ -157,9 +173,9 @@ class WeatherWorker(Worker):
         while not self._stop.is_set():
             try:
                 log.info("starting rtl_433: %s", " ".join(cmd))
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
-                assert proc.stdout is not None
-                for line in proc.stdout:
+                self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+                assert self.proc.stdout is not None
+                for line in self.proc.stdout:
                     if self._stop.is_set():
                         break
                     line = line.strip()
@@ -171,11 +187,12 @@ class WeatherWorker(Worker):
                         continue
                     self.publish("devices", {"kind": "weather", "band_mhz": self.center_mhz,
                                              "decode": event})
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
+                if self.proc.poll() is None:
+                    self.proc.terminate()
+                    try:
+                        self.proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        self.proc.kill()
             except FileNotFoundError:
                 log.error("rtl_433 not found"); self._stop.wait(30)
             except Exception:  # noqa: BLE001
