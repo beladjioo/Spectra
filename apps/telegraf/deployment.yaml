@@ -28,8 +28,8 @@ spec:
               subPath: telegraf.conf
               readOnly: true
           resources:
-            requests: { cpu: 50m, memory: 64Mi }
-            limits: { cpu: 250m, memory: 192Mi }
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 768Mi }
       volumes:
         - name: config
           configMap:
