@@ -8,8 +8,8 @@ spec:
   selector:
     app.kubernetes.io/name: mosquitto
   ports:
-    - { name: mqtt, port: 1883, targetPort: 1883 }
-    - { name: mqtt-tls, port: 8883, targetPort: 8883 }
-  # For edge sensors to reach this, expose 8883 via LoadBalancer/NodePort or an
-  # Ingress with TLS passthrough. Keep 1883 cluster-internal only.
-  type: ClusterIP
+    # Exposed on every node at :31883 so edge agents (HackRF on the Jetson) can
+    # publish over the LAN. Plaintext is fine for a homelab; switch to the TLS
+    # 8883 listener + a NodePort/LoadBalancer before exposing beyond the LAN.
+    - { name: mqtt, port: 1883, targetPort: 1883, nodePort: 31883 }
+  type: NodePort
