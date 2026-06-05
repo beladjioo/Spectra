@@ -10,6 +10,10 @@ data:
       omit_hostname = true
       debug = true
 
+    [[outputs.file]]
+      files = ["stdout"]
+      data_format = "influx"
+
     [[outputs.influxdb]]
       urls = ["http://vmsingle-victoria-metrics-single-server.spectra.svc:8428"]
       database = "spectra"
