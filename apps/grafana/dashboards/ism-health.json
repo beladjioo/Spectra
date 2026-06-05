@@ -66,6 +66,38 @@
           "legendFormat": "{{sensor_id}}"
         }
       ]
+    },
+    {
+      "title": "Waterfall — power per frequency bin (dB)  [select ONE sensor]",
+      "type": "heatmap",
+      "datasource": "VictoriaMetrics",
+      "description": "Spectrogram: frequency (Y) over time (X), colour = power. Pick a single sensor in the dropdown for a clean view.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+      "options": {
+        "calculate": false,
+        "cellGap": 0,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Turbo",
+          "steps": 64,
+          "reverse": false
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "unit": "short",
+          "decimals": 1
+        },
+        "tooltip": { "show": true, "yHistogram": false },
+        "legend": { "show": true },
+        "exemplars": { "color": "rgba(255,0,255,0.7)" }
+      },
+      "targets": [
+        {
+          "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"}",
+          "legendFormat": "{{freq_mhz}}",
+          "format": "time_series"
+        }
+      ]
     }
   ]
 }

@@ -17,13 +17,12 @@ data:
       database = "spectra"
 
     # Input: subscribe to the edge agents' sweep stream and parse the JSON.
-    # (Device decode events on spectra/+/devices need their own json_v2 block —
-    #  TODO once we wire rtl_433 ingestion; kept out here to avoid parse errors.)
     [[inputs.mqtt_consumer]]
       servers = ["tcp://mosquitto.spectra.svc:1883"]
       topics = ["spectra/+/sweep"]
       data_format = "json_v2"
 
+      # Block 1: scalar summary metrics -> measurement rf_sweep
       [[inputs.mqtt_consumer.json_v2]]
         measurement_name = "rf_sweep"
         timestamp_path = "ts"
@@ -41,3 +40,17 @@ data:
         [[inputs.mqtt_consumer.json_v2.field]]
           path = "interference"
           type = "bool"
+
+      # Block 2: per-frequency-bin power -> measurement rf_spectrum, one series
+      # per (sensor_id, freq_mhz). This feeds the Grafana waterfall/heatmap.
+      [[inputs.mqtt_consumer.json_v2]]
+        measurement_name = "rf_spectrum"
+        timestamp_path = "ts"
+        timestamp_format = "unix"
+
+        [[inputs.mqtt_consumer.json_v2.tag]]
+          path = "sensor_id"
+
+        [[inputs.mqtt_consumer.json_v2.object]]
+          path = "bins"
+          tags = ["freq_mhz"]
