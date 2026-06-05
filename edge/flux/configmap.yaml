@@ -6,9 +6,10 @@ metadata:
 data:
   config.yaml: |
     # sensor_id is overridden by SPECTRA_SENSOR_ID (the node name) in the DaemonSet.
-    mqtt_host: mqtt.spectra.example.com   # TODO: your central cluster's MQTT endpoint
-    mqtt_port: 8883
-    mqtt_tls: true
+    # In-cluster: reach Mosquitto via its ClusterIP service, plaintext.
+    mqtt_host: mosquitto.spectra.svc
+    mqtt_port: 1883
+    mqtt_tls: false
     topic_prefix: spectra
 
     sweep_freq_min_mhz: 863
@@ -18,9 +19,8 @@ data:
     sweep_vga_gain: 20
     sweep_interval_s: 5.0
 
-    rtl433_enabled: true
-    rtl433_device: "soapy:driver=hackrf"
-    rtl433_frequency: "868.3M"
-    rtl433_sample_rate: "1024k"
+    # A single HackRF can't run hackrf_sweep and rtl_433 at the same time.
+    # Keep decode off until we time-share the device or add a second SDR.
+    rtl433_enabled: false
 
     noise_floor_dbm_threshold: -65.0

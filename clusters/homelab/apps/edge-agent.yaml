@@ -1,0 +1,23 @@
+# Deploys the Spectra edge agent (HackRF sweep -> MQTT) as a DaemonSet on nodes
+# labelled spectra.io/hackrf=true. Image is built/published by the edge-agent CI
+# workflow to ghcr.io/beladjioo/spectra-edge-agent.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: edge-agent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/beladjioo/Spectra.git
+    targetRevision: main
+    path: edge/flux
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spectra-edge
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
