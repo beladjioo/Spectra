@@ -14,6 +14,9 @@ spec:
     helm:
       releaseName: grafana
       values: |
+        service:
+          type: NodePort
+          nodePort: 30030
         admin:
           existingSecret: spectra-grafana-admin   # TODO: create via sealed-secrets
         persistence:
