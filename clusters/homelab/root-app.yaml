@@ -11,7 +11,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGEME/spectra.git   # TODO: your repo URL
+    repoURL: https://github.com/beladjioo/Spectra.git   # TODO: your repo URL
     targetRevision: main
     path: clusters/homelab/apps
     directory:
