@@ -75,7 +75,7 @@
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
       "targets": [
         {
-          "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"}",
+          "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"} + 120",
           "legendFormat": "{{freq_mhz}}",
           "format": "time_series",
           "range": true
@@ -88,12 +88,13 @@
         "calculate": false,
         "cellGap": 0,
         "rowsFrame": { "layout": "auto" },
+        "filterValues": { "le": -1000000000 },
         "color": {
           "mode": "scheme",
           "scheme": "Turbo",
           "steps": 64,
-          "min": -95,
-          "max": -35,
+          "min": 20,
+          "max": 85,
           "reverse": false
         },
         "yAxis": {
