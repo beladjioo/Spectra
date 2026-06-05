@@ -5,7 +5,7 @@
   "timezone": "browser",
   "schemaVersion": 39,
   "refresh": "10s",
-  "time": { "from": "now-3h", "to": "now" },
+  "time": { "from": "now-20m", "to": "now" },
   "templating": {
     "list": [
       {
@@ -14,72 +14,106 @@
         "datasource": "VictoriaMetrics",
         "query": "label_values(rf_sweep_noise_floor_db, sensor_id)",
         "includeAll": true,
-        "multi": true
+        "multi": true,
+        "current": { "text": "jetson-desktop", "value": "jetson-desktop" }
       }
     ]
   },
   "panels": [
     {
+      "title": "HackRF mode — click to retune the radio",
+      "type": "canvas",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "inlineEditing": false,
+        "showAdvancedTypes": true,
+        "panZoom": false,
+        "infinitePan": false,
+        "root": {
+          "type": "frame",
+          "name": "Element 1",
+          "elements": [
+            {
+              "type": "button",
+              "name": "Sweep 868",
+              "config": {
+                "text": { "mode": "fixed", "fixed": "📡  Sweep 868" },
+                "align": "center", "size": 16, "variant": "primary",
+                "color": { "fixed": "#ffffff" },
+                "api": { "endpoint": "http://192.168.1.55:30890/?sensor=jetson-desktop&mode=sweep", "method": "GET" }
+              },
+              "background": { "color": { "fixed": "#1f60c4" } },
+              "placement": { "top": 12, "left": 20, "width": 200, "height": 50 },
+              "constraint": { "horizontal": "left", "vertical": "top" }
+            },
+            {
+              "type": "button",
+              "name": "Weather 433",
+              "config": {
+                "text": { "mode": "fixed", "fixed": "🌡️  Weather 433" },
+                "align": "center", "size": 16, "variant": "primary",
+                "color": { "fixed": "#ffffff" },
+                "api": { "endpoint": "http://192.168.1.55:30890/?sensor=jetson-desktop&mode=weather433", "method": "GET" }
+              },
+              "background": { "color": { "fixed": "#37872d" } },
+              "placement": { "top": 12, "left": 240, "width": 200, "height": 50 },
+              "constraint": { "horizontal": "left", "vertical": "top" }
+            },
+            {
+              "type": "button",
+              "name": "Weather 868",
+              "config": {
+                "text": { "mode": "fixed", "fixed": "🌡️  Weather 868" },
+                "align": "center", "size": 16, "variant": "primary",
+                "color": { "fixed": "#ffffff" },
+                "api": { "endpoint": "http://192.168.1.55:30890/?sensor=jetson-desktop&mode=weather868", "method": "GET" }
+              },
+              "background": { "color": { "fixed": "#8a6d0b" } },
+              "placement": { "top": 12, "left": 460, "width": 200, "height": 50 },
+              "constraint": { "horizontal": "left", "vertical": "top" }
+            }
+          ],
+          "background": { "color": { "fixed": "transparent" } },
+          "border": { "color": { "fixed": "dark-green" } }
+        }
+      }
+    },
+    {
       "title": "Noise floor (dB)",
       "type": "timeseries",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "targets": [
-        {
-          "expr": "rf_sweep_noise_floor_db{sensor_id=~\"$sensor\"}",
-          "legendFormat": "{{sensor_id}}"
-        }
-      ]
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{ "expr": "rf_sweep_noise_floor_db{sensor_id=~\"$sensor\"}", "legendFormat": "{{sensor_id}}" }]
     },
     {
       "title": "Band occupancy ratio",
       "type": "timeseries",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "targets": [
-        {
-          "expr": "rf_sweep_occupancy_ratio{sensor_id=~\"$sensor\"}",
-          "legendFormat": "{{sensor_id}}"
-        }
-      ]
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [{ "expr": "rf_sweep_occupancy_ratio{sensor_id=~\"$sensor\"}", "legendFormat": "{{sensor_id}}" }]
     },
     {
       "title": "Interference flag",
       "type": "state-timeline",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 8 },
-      "targets": [
-        {
-          "expr": "rf_sweep_interference{sensor_id=~\"$sensor\"}",
-          "legendFormat": "{{sensor_id}}"
-        }
-      ]
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 12 },
+      "targets": [{ "expr": "rf_sweep_interference{sensor_id=~\"$sensor\"}", "legendFormat": "{{sensor_id}}" }]
     },
     {
       "title": "Peak power (dB)",
       "type": "timeseries",
       "datasource": "VictoriaMetrics",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
-      "targets": [
-        {
-          "expr": "rf_sweep_peak_db{sensor_id=~\"$sensor\"}",
-          "legendFormat": "{{sensor_id}}"
-        }
-      ]
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "targets": [{ "expr": "rf_sweep_peak_db{sensor_id=~\"$sensor\"}", "legendFormat": "{{sensor_id}}" }]
     },
     {
       "title": "Waterfall — power per frequency bin (dB)  [select ONE sensor]",
       "type": "heatmap",
       "datasource": "VictoriaMetrics",
-      "description": "Spectrogram: frequency (Y) over time (X), colour = power. Pick a single sensor in the dropdown for a clean view.",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+      "description": "Spectrogram: frequency (Y) over time (X), colour = power. Pick a single sensor.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 26 },
       "targets": [
-        {
-          "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"}",
-          "legendFormat": "{{freq_mhz}}",
-          "format": "time_series",
-          "range": true
-        }
+        { "expr": "rf_spectrum_power_db{sensor_id=~\"$sensor\"}", "legendFormat": "{{freq_mhz}}", "format": "time_series", "range": true }
       ],
       "transformations": [
         { "id": "prepareTimeSeries", "options": { "format": "timeseries-wide" } }
@@ -89,19 +123,8 @@
         "cellGap": 0,
         "rowsFrame": { "layout": "auto" },
         "filterValues": { "le": -1000000000 },
-        "color": {
-          "mode": "scheme",
-          "scheme": "Turbo",
-          "steps": 64,
-          "min": -95,
-          "max": -35,
-          "reverse": false
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "unit": "short",
-          "decimals": 1
-        },
+        "color": { "mode": "scheme", "scheme": "Turbo", "steps": 64, "min": -95, "max": -35, "reverse": false },
+        "yAxis": { "axisPlacement": "left", "unit": "short", "decimals": 1 },
         "tooltip": { "show": true, "yHistogram": false },
         "legend": { "show": false }
       }
