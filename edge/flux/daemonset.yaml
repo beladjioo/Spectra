@@ -27,6 +27,8 @@ spec:
           imagePullPolicy: Always
           securityContext:
             privileged: true   # raw USB access to the HackRF
+          ports:
+            - { name: audio, containerPort: 8000 }   # FM live-audio MP3 stream
           env:
             - name: SPECTRA_SENSOR_ID
               valueFrom:

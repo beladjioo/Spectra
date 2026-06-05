@@ -20,11 +20,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
 import signal
 import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
 import paho.mqtt.client as mqtt
@@ -199,6 +201,106 @@ class WeatherWorker(Worker):
                 log.exception("rtl_433 failed; retry in 5s"); self._stop.wait(5)
 
 
+class ListenFmWorker(Worker):
+    """Tunes the HackRF to one FM station, demodulates it (rx_fm), encodes MP3
+    (ffmpeg) and broadcasts the live stream over HTTP on :8000 (GET /fm.mp3).
+    A Grafana <audio> panel plays it. Exclusive use of the HackRF."""
+
+    AUDIO_PORT = 8000
+
+    def __init__(self, cfg, publish, freq_mhz: float):
+        super().__init__(cfg, publish)
+        self.freq_mhz = freq_mhz
+        self.center_mhz = freq_mhz
+        self.band_label = f"🎧 FM {freq_mhz:g} MHz (live audio)"
+        self._procs: list[subprocess.Popen] = []
+        self._httpd: ThreadingHTTPServer | None = None
+        self._clients: set[queue.Queue] = set()
+        self._clients_lock = threading.Lock()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._httpd:
+            try:
+                self._httpd.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+        for p in self._procs:
+            if p.poll() is None:
+                p.terminate()
+        time.sleep(0.5)
+        for p in self._procs:
+            if p.poll() is None:
+                p.kill()
+        if self._thread:
+            self._thread.join(timeout=8)
+
+    def _serve(self) -> None:
+        w = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                q: queue.Queue = queue.Queue(maxsize=128)
+                with w._clients_lock:
+                    w._clients.add(q)
+                try:
+                    while not w._stop.is_set():
+                        try:
+                            self.wfile.write(q.get(timeout=1))
+                        except queue.Empty:
+                            continue
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                finally:
+                    with w._clients_lock:
+                        w._clients.discard(q)
+
+            def log_message(self, *a):
+                pass
+
+        self._httpd = ThreadingHTTPServer(("0.0.0.0", self.AUDIO_PORT), Handler)
+        self._httpd.daemon_threads = True
+        self._httpd.serve_forever()
+
+    def _run(self) -> None:
+        threading.Thread(target=self._serve, daemon=True).start()
+        rx = ["python3", "/app/fm_demod.py", str(self.freq_mhz)]
+        ff = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "s16le",
+              "-ar", "48000", "-ac", "1", "-i", "pipe:0",
+              "-c:a", "libmp3lame", "-b:a", "96k", "-f", "mp3", "pipe:1"]
+        while not self._stop.is_set():
+            try:
+                log.info("listen_fm: %s | ffmpeg mp3", " ".join(rx))
+                rxp = subprocess.Popen(rx, stdout=subprocess.PIPE)
+                ffp = subprocess.Popen(ff, stdin=rxp.stdout, stdout=subprocess.PIPE)
+                rxp.stdout.close()  # type: ignore[union-attr]
+                self._procs = [rxp, ffp]
+                assert ffp.stdout is not None
+                while not self._stop.is_set():
+                    chunk = ffp.stdout.read(4096)
+                    if not chunk:
+                        break
+                    with self._clients_lock:
+                        clients = list(self._clients)
+                    for q in clients:
+                        try:
+                            q.put_nowait(chunk)
+                        except queue.Full:
+                            pass
+                for p in (rxp, ffp):
+                    if p.poll() is None:
+                        p.terminate()
+            except FileNotFoundError:
+                log.error("rx_fm/ffmpeg not found"); self._stop.wait(30)
+            except Exception:  # noqa: BLE001
+                log.exception("listen_fm failed; retry in 5s"); self._stop.wait(5)
+
+
 WORKERS: dict[str, Callable[[Config, Callable[[str, dict[str, Any]], None]], Worker]] = {
     "sweep868":  lambda c, p: SweepWorker(c, p, 863, 870, "868 ISM (863-870 MHz)"),
     "sweepfm":   lambda c, p: SweepWorker(c, p, 88, 108, "FM radio (88-108 MHz)"),
@@ -254,10 +356,22 @@ class Agent:
             mode = raw
         self.set_mode(mode)
 
+    def _factory(self, mode: str):
+        if mode in WORKERS:
+            return WORKERS[mode]
+        if mode.startswith("listenfm:"):  # listenfm:100.0 -> tune & stream that station
+            try:
+                f = float(mode.split(":", 1)[1])
+            except ValueError:
+                return None
+            return lambda c, p: ListenFmWorker(c, p, f)
+        return None
+
     def set_mode(self, mode: str) -> None:
         mode = (mode or "").strip()
-        if mode not in WORKERS:
-            log.warning("unknown mode %r (known: %s)", mode, list(WORKERS))
+        factory = self._factory(mode)
+        if factory is None:
+            log.warning("unknown mode %r (known: %s + listenfm:<freq>)", mode, list(WORKERS))
             return
         with self._lock:
             if mode == self._mode and self._current is not None:
@@ -268,7 +382,7 @@ class Agent:
                 self._current = None
                 time.sleep(1.0)
             log.info("starting mode %s", mode)
-            self._current = WORKERS[mode](self.cfg, self.publish)
+            self._current = factory(self.cfg, self.publish)
             self._current.start()
             self._mode = mode
         self._publish_status()

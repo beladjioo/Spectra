@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spectra-agent-audio
+  namespace: spectra-edge
+  labels:
+    app.kubernetes.io/name: spectra-agent
+spec:
+  # Exposes the edge agent's FM audio stream on every node at :30900 so the
+  # Grafana <audio> player (in your browser) can reach it:
+  #   http://<node-ip>:30900/fm.mp3   (only streams while mode = listenfm:<freq>)
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: spectra-agent
+  ports:
+    - { name: audio, port: 8000, targetPort: 8000, nodePort: 30900 }
