@@ -18,6 +18,10 @@ spec:
         # can be plain <a> links targeting a hidden iframe -> reliable, no plugin.
         env:
           GF_PANELS_DISABLE_SANITIZE_HTML: "true"
+        # PVC perms are already correct (old pod runs fine); the chart's chown
+        # init container isn't root in this version and fails -> disable it.
+        initChownData:
+          enabled: false
         service:
           type: NodePort
           nodePort: 30030
