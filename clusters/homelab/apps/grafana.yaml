@@ -14,6 +14,10 @@ spec:
     helm:
       releaseName: grafana
       values: |
+        # Allow raw HTML in Text panels (homelab LAN) so the mode-selector buttons
+        # can be plain <a> links targeting a hidden iframe -> reliable, no plugin.
+        env:
+          GF_PANELS_DISABLE_SANITIZE_HTML: "true"
         service:
           type: NodePort
           nodePort: 30030
