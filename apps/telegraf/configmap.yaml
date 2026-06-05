@@ -8,24 +8,21 @@ data:
       interval = "10s"
       flush_interval = "10s"
       omit_hostname = true
-      debug = true
-
-    [[outputs.file]]
-      files = ["stdout"]
-      data_format = "influx"
 
     [[outputs.influxdb]]
       urls = ["http://vmsingle-victoria-metrics-single-server.spectra.svc:8428"]
       database = "spectra"
 
+    # Two SEPARATE mqtt_consumer inputs (each its own client_id + single json_v2)
+    # so the parsers don't interfere — a second json_v2 block in one input silently
+    # killed the first block's output.
+
+    # Input A: scalar summary -> rf_sweep_{noise_floor_db,peak_db,occupancy_ratio,interference}
     [[inputs.mqtt_consumer]]
       servers = ["tcp://mosquitto.spectra.svc:1883"]
+      client_id = "telegraf-rf-sweep"
       topics = ["spectra/+/sweep"]
       data_format = "json_v2"
-
-      # Block 1: scalar summary metrics -> rf_sweep_*
-      # No timestamp_path: Telegraf stamps at ingestion time (robust; the message
-      # "ts" field caused frozen/old timestamps).
       [[inputs.mqtt_consumer.json_v2]]
         measurement_name = "rf_sweep"
         [[inputs.mqtt_consumer.json_v2.tag]]
@@ -40,7 +37,12 @@ data:
           path = "interference"
           type = "bool"
 
-      # Block 2: per-frequency-bin power -> rf_spectrum_power_db{freq_mhz}
+    # Input B: per-frequency-bin power -> rf_spectrum_power_db{freq_mhz}
+    [[inputs.mqtt_consumer]]
+      servers = ["tcp://mosquitto.spectra.svc:1883"]
+      client_id = "telegraf-rf-spectrum"
+      topics = ["spectra/+/sweep"]
+      data_format = "json_v2"
       [[inputs.mqtt_consumer.json_v2]]
         measurement_name = "rf_spectrum"
         [[inputs.mqtt_consumer.json_v2.tag]]
