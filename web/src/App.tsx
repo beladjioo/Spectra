@@ -22,10 +22,12 @@ export default function App() {
   const [points, setPoints] = useState<Pt[]>([]);
   const lastPt = useRef<{ lat: number; lon: number } | null>(null);
 
+  // target whatever sensor the agent reports (node name on the Pi box, not hardcoded)
+  const sensor = status?.sensor_id ?? sweep?.sensor_id ?? "jetson-desktop";
   const pick = (l: Layer) => {
     setLayer(l);
     setPoints([]); lastPt.current = null;            // each layer = its own map
-    setMode(l === "noise" ? "sweep868" : "lora_activity");
+    setMode(l === "noise" ? "sweep868" : "lora_activity", sensor);
   };
 
   // record a point on each fresh measurement while recording + GPS fix
