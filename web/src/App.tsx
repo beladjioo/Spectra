@@ -17,7 +17,7 @@ export default function App() {
   const { connected, sweep, status, lora } = useSpectra();
   const sdr = status?.sdr;
   const [layer, setLayer] = useState<Layer>("noise");
-  const [me, setMe] = useState<{ lat: number; lon: number } | null>(null);
+  const [me, setMe] = useState<{ lat: number; lon: number; acc?: number } | null>(null);
   const [recording, setRecording] = useState(false);
   const [points, setPoints] = useState<Pt[]>([]);
   const lastPt = useRef<{ lat: number; lon: number } | null>(null);
@@ -50,9 +50,9 @@ export default function App() {
   const startGps = () => {
     if (!navigator.geolocation) return alert("Géolocalisation non supportée");
     navigator.geolocation.watchPosition(
-      (g) => setMe({ lat: g.coords.latitude, lon: g.coords.longitude }),
-      (e) => alert("Position refusée : " + e.message + "\n(ouvre l'app via http://localhost — contexte sécurisé requis)"),
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 },
+      (g) => setMe({ lat: g.coords.latitude, lon: g.coords.longitude, acc: g.coords.accuracy }),
+      (e) => alert("Position refusée : " + e.message + "\n(ouvre l'app en HTTPS — https://<ip>:30943 — pour autoriser le GPS)"),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
   };
 
@@ -144,7 +144,10 @@ export default function App() {
           <section className="rounded-2xl border border-edge bg-panel p-4">
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Relevé terrain</h2>
             <button onClick={startGps} className={`mb-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold ${me ? "border-phos bg-phos text-ink" : "border-edge bg-edge text-slate-200 hover:border-phos"}`}>
-              📍 {me ? "Position active" : "Activer ma position"}</button>
+              📍 {me ? `Position active · ±${Math.round(me.acc ?? 0)} m` : "Activer ma position"}</button>
+            {me && (me.acc ?? 0) > 50 && (
+              <div className="mb-2 text-xs text-amber">⚠️ Précision faible (±{Math.round(me.acc ?? 0)} m) — utilise un téléphone (vrai GPS) pour des points précis.</div>
+            )}
             <button onClick={() => { if (!me) return alert("Active d'abord ta position 📍"); setRecording((r) => !r); }}
               className={`mb-2 w-full rounded-xl px-4 py-3 text-sm font-semibold ${recording ? "bg-rose-500 text-white" : "bg-phos text-ink"}`}>
               {recording ? "■ Arrêter le relevé" : "● Démarrer le relevé"}</button>

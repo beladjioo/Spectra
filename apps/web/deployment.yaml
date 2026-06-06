@@ -21,6 +21,7 @@ spec:
           imagePullPolicy: Always
           ports:
             - { name: http, containerPort: 80 }
+            - { name: https, containerPort: 443 }
           readinessProbe:
             httpGet: { path: /, port: 80 }
             initialDelaySeconds: 5
@@ -41,3 +42,5 @@ spec:
     app.kubernetes.io/name: spectra-web
   ports:
     - { name: http, port: 80, targetPort: 80, nodePort: 30920 }
+    # HTTPS (self-signed) — open https://<node-ip>:30943 so browser GPS works.
+    - { name: https, port: 443, targetPort: 443, nodePort: 30943 }
