@@ -22,14 +22,23 @@ export type Status = {
   ts: number;
 };
 export type DeviceEvent = { sensor_id: string; kind: string; decode: any; ts: number };
+export type Lora = {
+  channel_mhz: number;
+  bursts_per_min: number;
+  last_burst_db: number | null;
+  max_burst_db: number | null;
+  noise_floor_db: number;
+  ts: number;
+};
 
-type Msg = { topic: string; kind: "sweep" | "devices" | "status"; data: any };
+type Msg = { topic: string; kind: "sweep" | "devices" | "status" | "lora"; data: any };
 
 /** Subscribes to the gateway WebSocket and exposes the live RF state. */
 export function useSpectra() {
   const [connected, setConnected] = useState(false);
   const [sweep, setSweep] = useState<Sweep | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
+  const [lora, setLora] = useState<Lora | null>(null);
   const [devices, setDevices] = useState<DeviceEvent[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -49,6 +58,7 @@ export function useSpectra() {
         const m: Msg = JSON.parse(e.data);
         if (m.kind === "sweep") setSweep(m.data);
         else if (m.kind === "status") setStatus(m.data);
+        else if (m.kind === "lora") setLora(m.data);
         else if (m.kind === "devices")
           setDevices((d) => [{ ...m.data }, ...d].slice(0, 100));
       };
@@ -60,7 +70,7 @@ export function useSpectra() {
     };
   }, []);
 
-  return { connected, sweep, status, devices };
+  return { connected, sweep, status, lora, devices };
 }
 
 export async function setMode(mode: string, sensor = "jetson-desktop") {

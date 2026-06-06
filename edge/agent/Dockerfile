@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY agent.py fm_demod.py config.example.yaml ./
+COPY agent.py fm_demod.py lora_activity.py config.example.yaml ./
 
 # Default config path; override with a mounted config.yaml + env secrets.
 ENV SPECTRA_CONFIG=/app/config.yaml \

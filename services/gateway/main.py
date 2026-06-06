@@ -69,7 +69,7 @@ async def _mqtt_loop() -> None:
     while True:
         try:
             async with aiomqtt.Client(MQTT_HOST, MQTT_PORT) as client:
-                for t in ("spectra/+/sweep", "spectra/+/devices", "spectra/+/status"):
+                for t in ("spectra/+/sweep", "spectra/+/devices", "spectra/+/status", "spectra/+/lora"):
                     await client.subscribe(t)
                 async for msg in client.messages:
                     topic = str(msg.topic)

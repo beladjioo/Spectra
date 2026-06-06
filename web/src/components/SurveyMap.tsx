@@ -4,9 +4,8 @@ import maplibregl from "maplibre-gl";
 export type Pt = {
   lat: number;
   lon: number;
-  nf: number; // noise_floor_db
-  occ: number;
-  interference: boolean;
+  q: number; // quality 0..1 (1 = good/green, 0 = bad/red) — layer-dependent
+  label: string; // tooltip text
   ts: number;
 };
 
@@ -53,8 +52,8 @@ export default function SurveyMap({ me, points }: { me: { lat: number; lon: numb
           "circle-stroke-width": 1,
           "circle-stroke-color": "rgba(0,0,0,.4)",
           "circle-color": [
-            "interpolate", ["linear"], ["get", "nf"],
-            -90, "#4af2c8", -72, "#ffe14a", -55, "#ff5d5d",
+            "interpolate", ["linear"], ["get", "q"],
+            0, "#ff5d5d", 0.5, "#ffe14a", 1, "#4af2c8",
           ],
         },
       });
@@ -71,7 +70,7 @@ export default function SurveyMap({ me, points }: { me: { lat: number; lon: numb
       features: points.map((p) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [p.lon, p.lat] },
-        properties: { nf: p.nf, occ: p.occ, interference: p.interference },
+        properties: { q: p.q, label: p.label },
       })),
     });
   }, [points]);

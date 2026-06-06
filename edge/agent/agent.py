@@ -301,8 +301,58 @@ class ListenFmWorker(Worker):
                 log.exception("listen_fm failed; retry in 5s"); self._stop.wait(5)
 
 
+class LoRaActivityWorker(Worker):
+    """Runs lora_activity.py: detects LoRa uplink bursts on 868 g1 and publishes
+    a coverage summary (bursts/min + strength) to spectra/<sensor>/lora."""
+
+    band_label = "Activité LoRa · 868 g1"
+    center_mhz = 868.3
+
+    def __init__(self, cfg, publish):
+        super().__init__(cfg, publish)
+        self.proc: subprocess.Popen | None = None
+
+    def stop(self) -> None:
+        self._stop.set()
+        p = self.proc
+        if p and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        if self._thread:
+            self._thread.join(timeout=8)
+
+    def _run(self) -> None:
+        cmd = ["python3", "/app/lora_activity.py"]
+        while not self._stop.is_set():
+            try:
+                log.info("starting lora_activity")
+                self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+                assert self.proc.stdout is not None
+                for line in self.proc.stdout:
+                    if self._stop.is_set():
+                        break
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    self.publish("lora", ev)
+                if self.proc.poll() is None:
+                    self.proc.terminate()
+            except FileNotFoundError:
+                log.error("lora_activity.py / python3 missing"); self._stop.wait(30)
+            except Exception:  # noqa: BLE001
+                log.exception("lora_activity failed; retry in 5s"); self._stop.wait(5)
+
+
 WORKERS: dict[str, Callable[[Config, Callable[[str, dict[str, Any]], None]], Worker]] = {
     "sweep868":  lambda c, p: SweepWorker(c, p, 863, 870, "868 ISM (863-870 MHz)"),
+    "lora_activity": lambda c, p: LoRaActivityWorker(c, p),
     "sweepfm":   lambda c, p: SweepWorker(c, p, 88, 108, "FM radio (88-108 MHz)"),
     "sweep24":   lambda c, p: SweepWorker(c, p, 2400, 2483, "2.4 GHz WiFi/BT", 1_000_000),
     "weather433": lambda c, p: WeatherWorker(c, p, "433.92M", 433.92),
