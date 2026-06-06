@@ -38,9 +38,17 @@ export default function SurveyMap({ me, points }: { me: { lat: number; lon: numb
       style: DARK_STYLE,
       center: [3.901, 43.567], // Lattes/Montpellier
       zoom: 12,
+      renderWorldCopies: false,
+      attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    // MapLibre often inits before the container has its final size (esp. mobile):
+    // force resizes so the canvas fills the panel instead of rendering half.
+    const ro = new ResizeObserver(() => map.resize());
+    ro.observe(ref.current);
+    [100, 400, 1200].forEach((d) => setTimeout(() => map.resize(), d));
     map.on("load", () => {
+      map.resize();
       map.addSource("pts", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({
         id: "pts",
