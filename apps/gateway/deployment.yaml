@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spectra-gateway
+  labels:
+    app.kubernetes.io/name: spectra-gateway
+    app.kubernetes.io/part-of: spectra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spectra-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spectra-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/beladjioo/spectra-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - { name: http, containerPort: 8090 }
+          env:
+            - { name: MQTT_HOST, value: "mosquitto.spectra.svc" }
+            - { name: VM_URL, value: "http://vmsingle-victoria-metrics-single-server.spectra.svc:8428" }
+            - { name: LOKI_URL, value: "http://loki.spectra.svc:3100" }
+            - { name: CONTROL_URL, value: "http://spectra-control.spectra.svc:8080" }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8090 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spectra-gateway
+  labels:
+    app.kubernetes.io/name: spectra-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: spectra-gateway
+  ports:
+    - { name: http, port: 8090, targetPort: 8090 }

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spectra-web
+  labels:
+    app.kubernetes.io/name: spectra-web
+    app.kubernetes.io/part-of: spectra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spectra-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spectra-web
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/beladjioo/spectra-web:latest
+          imagePullPolicy: Always
+          ports:
+            - { name: http, containerPort: 80 }
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 25m, memory: 48Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spectra-web
+  labels:
+    app.kubernetes.io/name: spectra-web
+spec:
+  # The product UI — open http://<node-ip>:30920
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: spectra-web
+  ports:
+    - { name: http, port: 80, targetPort: 80, nodePort: 30920 }

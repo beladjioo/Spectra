@@ -1,0 +1,18 @@
+# spectra-web — the React/Tailwind product UI (NodePort 30920).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: web
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/beladjioo/Spectra.git
+    targetRevision: main
+    path: apps/web
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spectra
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]
