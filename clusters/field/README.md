@@ -1,48 +1,57 @@
-# Field cluster — survey on the laptop
+# Spectra field box — portable LoRa coverage survey (Raspberry Pi 5)
 
-Same GitOps repo, a **local k3s** on the survey laptop. The HackRF plugs into the
-laptop; ArgoCD pulls this repo and runs the lean survey stack
-(mosquitto + edge agent + gateway + web). Open the UI at **http://localhost:30920**
-(localhost is a secure context, so the browser GPS works).
+A pocket, **GitOps-driven** survey node: a Pi + HackRF + battery runs k3s, ArgoCD
+pulls this repo and deploys the lean survey stack (mosquitto + agent + gateway + web).
+Your **phone** joins the box's network, opens the UI over HTTPS, and provides the
+precise GPS while you walk/drive the commune.
 
-## 1. k3s on the laptop
+> Use a **dedicated Pi** for the field box — your home cluster's master Pi should stay home.
 
-**Linux laptop:**
+## Kit
+
+- **Raspberry Pi 5** (64-bit OS: Raspberry Pi OS or Ubuntu)
+- **HackRF One** + antenna (retract to ~8 cm for 868 MHz)
+- **USB-C PD power bank ≥ 30 W** (Pi 5 wants 5 V/5 A; the HackRF adds ~2.5 W)
+- A **phone** (real GPS) for location + display
+
+## 1. Bootstrap the Pi (once)
+
+Plug in the HackRF, then on the Pi:
 ```bash
-curl -sfL https://get.k3s.io | sh -
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+curl -sfL https://raw.githubusercontent.com/beladjioo/Spectra/main/clusters/field/bootstrap-pi.sh | bash
 ```
+This installs `hackrf` + `avahi` + k3s + ArgoCD, deploys the field stack, and labels
+the node so the agent grabs the HackRF. (Manual steps are in `bootstrap-pi.sh`.)
 
-**Windows laptop (WSL2):** run everything inside a WSL2 Ubuntu, then install k3s
-as above. Two WSL specifics:
-- enable systemd in `/etc/wsl.conf` (`[boot] systemd=true`) so k3s runs as a service;
-- pass the HackRF USB into WSL with **usbipd-win** on the Windows side:
-  ```powershell
-  usbipd list
-  usbipd bind --busid <hackrf-busid>
-  usbipd attach --wsl --busid <hackrf-busid>
-  ```
+## 2. Field networking (no home WiFi out there)
 
-## 2. ArgoCD + the field app-of-apps
-
+Easiest: **your phone is the hotspot, the Pi joins it.** Pre-configure the Pi once to
+auto-connect to your phone's hotspot:
 ```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-kubectl -n argocd rollout status deploy/argocd-server
-
-kubectl apply -f clusters/field/root-app.yaml
+sudo nmcli dev wifi connect "<your-phone-hotspot-SSID>" password "<password>"
 ```
+In the field: enable the phone hotspot → power the Pi (it auto-joins) → on the phone
+browse to **https://spectra.local:30943**.
 
-## 3. Tell the agent where the HackRF is
+> If `spectra.local` doesn't resolve (older Android), find the Pi's IP in the phone's
+> hotspot client list and use `https://<pi-ip>:30943`.
 
-```bash
-hackrf_info                                   # confirm the HackRF is seen
-kubectl label node "$(hostname)" spectra.io/hackrf=true
-```
+## 3. Survey
 
-ArgoCD now runs the survey stack. Open **http://localhost:30920**, allow location,
-press *Démarrer le relevé*, and walk/drive the commune.
+1. Open **https://spectra.local:30943** on the phone → accept the one-time self-signed
+   cert (needed so the browser GPS works).
+2. *Activer ma position* → check the accuracy (±m). A phone gives ~5-10 m.
+3. Pick a layer:
+   - **📈 Bruit 868** — green = quiet (gateway will hear well), red = noisy/interference.
+   - **📶 Activité LoRa** — green = uplinks heard (strong/many), red = dead zone.
+4. *Démarrer le relevé* → walk/drive. The map fills with colored points.
+5. **⬇ GeoJSON** to export the survey for your report / gateway-placement decision.
 
-> The HackRF is less sensitive than your Multitech concentrator — the map is
-> indicative (if the HackRF hears it, the gateway will; not necessarily the reverse).
-> Use it to spot noisy/quiet zones and the best gateway location.
+## Notes
+
+- **Passive / receive-only** — nothing is transmitted.
+- The HackRF is less sensitive than your Multitech SX1302 → the map is **indicative**
+  (if the HackRF hears it, the gateway will; not necessarily the reverse).
+- LoRa activity = **burst detection** (no DevAddr decode).
+- Same repo also bootstraps on a laptop (Linux, or k3s in WSL2 with `usbipd` USB
+  passthrough) if you prefer Option A.
