@@ -4,13 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#0a0e14",
-        panel: "#121821",
-        edge: "#1e2733",
-        accent: "#22d3ee",
+        ink: "#06090e",
+        panel: "#0c131d",
+        edge: "#1b2937",
+        phos: "#4af2c8",
+        amber: "#ffb454",
+        muted: "#697a8c",
       },
       fontFamily: {
-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        sans: ['"Hanken Grotesk"', "system-ui", "sans-serif"],
+        display: ['"Bricolage Grotesque"', "system-ui", "sans-serif"],
+        mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
       },
     },
   },

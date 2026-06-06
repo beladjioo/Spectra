@@ -1,0 +1,10 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: { name: field-edge-agent, namespace: argocd }
+spec:
+  project: default
+  source: { repoURL: "https://github.com/beladjioo/Spectra.git", targetRevision: main, path: edge/flux }
+  destination: { server: "https://kubernetes.default.svc", namespace: spectra-edge }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

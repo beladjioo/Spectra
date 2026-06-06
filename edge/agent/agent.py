@@ -324,6 +324,7 @@ class Agent:
     _mode: str = field(default="", init=False)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _stop: threading.Event = field(default_factory=threading.Event)
+    _sdr: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.client = mqtt.Client(client_id=f"spectra-agent-{self.cfg.sensor_id}")
@@ -387,6 +388,24 @@ class Agent:
             self._mode = mode
         self._publish_status()
 
+    def _probe_sdr(self) -> dict[str, Any]:
+        """Run hackrf_info once (at startup, device free) to report the SDR to the UI."""
+        try:
+            out = subprocess.run(["hackrf_info"], capture_output=True, text=True, timeout=8).stdout
+        except FileNotFoundError:
+            return {"present": False, "detail": "hackrf tools missing"}
+        except Exception as e:  # noqa: BLE001
+            return {"present": False, "detail": str(e)}
+        if "Found HackRF" not in out:
+            return {"present": False, "detail": "no HackRF detected"}
+
+        def field_(key: str) -> str:
+            return next((l.split(":", 1)[-1].strip() for l in out.splitlines() if key in l), "")
+
+        serial = field_("Serial number")
+        return {"present": True, "board": field_("Board ID Number") or "HackRF",
+                "serial": serial[-8:] if serial else "", "firmware": field_("Firmware Version")}
+
     def _publish_status(self) -> None:
         w = self._current
         topic = f"{self.cfg.topic_prefix}/{self.cfg.sensor_id}/status"
@@ -394,7 +413,7 @@ class Agent:
             "sensor_id": self.cfg.sensor_id, "mode": self._mode,
             "band_label": w.band_label if w else "idle",
             "center_mhz": w.center_mhz if w else 0,
-            "active": 1, "ts": time.time(),
+            "sdr": self._sdr, "active": 1, "ts": time.time(),
         }), qos=0, retain=True)
 
     def _heartbeat(self) -> None:
@@ -404,6 +423,8 @@ class Agent:
             self._stop.wait(10)
 
     def run(self) -> None:
+        self._sdr = self._probe_sdr()  # device is free at startup
+        log.info("SDR: %s", self._sdr)
         log.info("connecting to mqtt %s:%s", self.cfg.mqtt_host, self.cfg.mqtt_port)
         self.client.connect(self.cfg.mqtt_host, self.cfg.mqtt_port, keepalive=60)
         self.client.loop_start()

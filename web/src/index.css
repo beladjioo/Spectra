@@ -7,4 +7,12 @@ html, body, #root {
 }
 body {
   @apply bg-ink text-slate-200 font-sans antialiased;
+  background-image:
+    radial-gradient(900px 500px at 80% -10%, rgba(74, 242, 200, 0.10), transparent 60%),
+    radial-gradient(700px 500px at -10% 110%, rgba(255, 180, 84, 0.06), transparent 60%);
+  background-attachment: fixed;
+}
+.maplibregl-popup-content {
+  @apply border border-edge bg-panel text-slate-200;
+  font-family: '"IBM Plex Mono"', monospace;
 }

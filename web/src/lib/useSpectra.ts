@@ -12,11 +12,13 @@ export type Sweep = {
   bins: Bin[];
   ts: number;
 };
+export type Sdr = { present: boolean; board?: string; serial?: string; firmware?: string; detail?: string };
 export type Status = {
   sensor_id: string;
   mode: string;
   band_label: string;
   center_mhz: number;
+  sdr?: Sdr;
   ts: number;
 };
 export type DeviceEvent = { sensor_id: string; kind: string; decode: any; ts: number };
