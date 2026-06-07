@@ -47,7 +47,7 @@ export default function Library({
         </nav>
       </aside>
 
-      <section className="rounded-2xl border border-edge bg-panel p-5 md:p-7">
+      <section className="rounded-2xl border border-edge/70 bg-panel px-6 py-8 md:px-12 md:py-12">
         <NoteView slug={slug} onNote={onSelect} onMission={onMission} />
       </section>
     </div>
@@ -59,8 +59,10 @@ function NoteLink({ s, active, onClick }: { s: string; active: boolean; onClick:
     <li>
       <button
         onClick={onClick}
-        className={`w-full truncate rounded-lg px-2 py-1.5 text-left text-sm transition-colors ${
-          active ? "bg-phos/10 font-semibold text-phos" : "text-slate-300 hover:bg-edge/50"
+        className={`w-full truncate border-l-2 py-1.5 pl-3 pr-2 text-left text-[13px] transition-colors ${
+          active
+            ? "border-phos font-semibold text-phos"
+            : "border-transparent text-slate-400 hover:border-edge hover:text-slate-200"
         }`}
       >
         {titleOf(s)}
