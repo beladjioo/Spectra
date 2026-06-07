@@ -1,0 +1,17 @@
+[package]
+name = "spectra-drone-agent"
+version = "0.1.0"
+edition = "2021"
+description = "Edge drone-presence detector: HackRF 2.4/5.8 GHz wideband-burst signature detection -> MQTT"
+
+[dependencies]
+soapysdr = "0.4"
+rustfft = "6"
+num-complex = "0.4"
+rumqttc = "0.24"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
