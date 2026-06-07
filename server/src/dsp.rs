@@ -17,6 +17,15 @@ pub const OUT_BINS: usize = 256; // spectrum points sent to the UI
 const SNR_DB: f32 = 8.0; // a bin is "occupied" above noise + SNR_DB
 const WIDEBAND_MHZ: f32 = 5.0; // a band this wide ≈ an OFDM video link (drone)
 
+/// Which SDR is currently feeding the app (or none → simulator).
+#[derive(Clone, Default, Serialize)]
+pub struct SdrInfo {
+    pub present: bool,
+    pub driver: String, // e.g. "hackrf" (or "sim")
+    pub label: String, // e.g. "HackRF One #0 c66c…"
+    pub serial: String, // device serial number
+}
+
 #[derive(Clone, Serialize)]
 pub struct Peak {
     pub center_mhz: f32,
@@ -39,7 +48,8 @@ pub struct Frame {
     pub peaks: Vec<Peak>,
     pub drone_suspected: bool,
     pub bins: Vec<f32>, // OUT_BINS dB points
-    pub sim: bool,
+    pub sim: bool, // true when no real SDR is connected (simulator running)
+    pub sdr: SdrInfo,
     pub ts: f64,
 }
 
@@ -95,7 +105,7 @@ impl Analyzer {
 
 /// Turn a dB spectrum into a `Frame`: noise floor (20th pct), peaks/bursts,
 /// occupancy, and a downsampled trace.
-pub fn extract(db: &[f32], center_hz: f64, fs: f64, gain_db: f64, sim: bool) -> Frame {
+pub fn extract(db: &[f32], center_hz: f64, fs: f64, gain_db: f64, sdr: &SdrInfo) -> Frame {
     let n = db.len();
     let bin_hz = fs / n as f64;
 
@@ -150,7 +160,8 @@ pub fn extract(db: &[f32], center_hz: f64, fs: f64, gain_db: f64, sim: bool) -> 
         peaks,
         drone_suspected,
         bins,
-        sim,
+        sim: !sdr.present,
+        sdr: sdr.clone(),
         ts: now_ts(),
     }
 }

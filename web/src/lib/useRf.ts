@@ -21,6 +21,7 @@ export type Frame = {
   drone_suspected: boolean;
   bins: number[];
   sim: boolean;
+  sdr: { present: boolean; driver: string; label: string; serial: string };
   ts: number;
 };
 

@@ -26,7 +26,7 @@ use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::services::{ServeDir, ServeFile};
 
-use dsp::{extract, synth, Analyzer, Frame, Rng, N};
+use dsp::{extract, synth, Analyzer, Frame, Rng, SdrInfo, N};
 
 /// Current radio tuning, pushed from the web UI to the SDR thread.
 #[derive(Clone, Copy)]
@@ -122,35 +122,66 @@ async fn ws_task(mut sock: WebSocket, s: AppState) {
 // ---------------------------------------------------------------------------
 
 fn sdr_loop(
-    sim: bool,
+    sim_forced: bool,
     frames: broadcast::Sender<Arc<Frame>>,
     mut cmds: mpsc::UnboundedReceiver<Tune>,
     init: Tune,
 ) {
     let mut cur = init;
-    if !sim {
-        if let Err(e) = real_loop(&frames, &mut cmds, &mut cur) {
-            eprintln!("SDR unavailable ({e}) — using the simulator (set SDR_SIM=1 to silence)");
-        } else {
-            return;
+    loop {
+        if !sim_forced {
+            if let Some((args, info)) = probe() {
+                eprintln!("SDR detected: {} (serial {})", info.label, info.serial);
+                if let Err(e) = real_loop(&frames, &mut cmds, &mut cur, args, &info) {
+                    eprintln!("SDR lost ({e}) — back to simulator, will keep scanning");
+                }
+            }
         }
+        // No SDR (or forced sim): run the simulator. When not forced, return after
+        // a few seconds so a freshly plugged SDR gets picked up (hot-plug).
+        let sim = SdrInfo {
+            present: false,
+            driver: "sim".into(),
+            label: "Simulateur".into(),
+            serial: String::new(),
+        };
+        sim_loop(&frames, &mut cmds, &mut cur, &sim, sim_forced);
     }
-    sim_loop(&frames, &mut cmds, &mut cur);
+}
+
+/// Enumerate connected SDRs; return the first one's open-args and its identity.
+fn probe() -> Option<(soapysdr::Args, SdrInfo)> {
+    let args = soapysdr::enumerate("").ok()?.into_iter().next()?;
+    let get = |k: &str| args.get(k).unwrap_or("").to_string();
+    let nz = |s: String, d: &str| if s.is_empty() { d.to_string() } else { s };
+    let info = SdrInfo {
+        present: true,
+        driver: nz(get("driver"), "sdr"),
+        label: nz(get("label"), "SDR"),
+        serial: get("serial"),
+    };
+    Some((args, info))
 }
 
 fn sim_loop(
     frames: &broadcast::Sender<Arc<Frame>>,
     cmds: &mut mpsc::UnboundedReceiver<Tune>,
     cur: &mut Tune,
+    info: &SdrInfo,
+    forever: bool,
 ) {
     let mut rng = Rng::new(0xC0FFEE);
+    let start = std::time::Instant::now();
     loop {
         while let Ok(c) = cmds.try_recv() {
             *cur = c;
         }
         let db = synth(cur.center_hz, cur.fs, &mut rng);
-        let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, true)));
+        let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, info)));
         std::thread::sleep(Duration::from_millis(120));
+        if !forever && start.elapsed() >= Duration::from_secs(3) {
+            return; // rescan for a hot-plugged SDR
+        }
     }
 }
 
@@ -158,10 +189,12 @@ fn real_loop(
     frames: &broadcast::Sender<Arc<Frame>>,
     cmds: &mut mpsc::UnboundedReceiver<Tune>,
     cur: &mut Tune,
+    args: soapysdr::Args,
+    info: &SdrInfo,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use soapysdr::Direction::Rx;
 
-    let dev = soapysdr::Device::new("driver=hackrf")?;
+    let dev = soapysdr::Device::new(args)?;
     dev.set_sample_rate(Rx, 0, cur.fs)?;
     dev.set_frequency(Rx, 0, cur.center_hz, ())?;
     let _ = dev.set_gain(Rx, 0, cur.gain);
@@ -171,6 +204,7 @@ fn real_loop(
     let mut an = Analyzer::new();
     let mut buf = vec![Complex::new(0.0f32, 0.0); N];
     const AVG: usize = 16;
+    let mut errors = 0u32;
 
     loop {
         // apply pending retune commands from the UI
@@ -184,13 +218,19 @@ fn real_loop(
             }
         }
         for _ in 0..AVG {
-            if let Ok(n) = stream.read(&mut [&mut buf], 1_000_000) {
-                if n == N {
+            match stream.read(&mut [&mut buf], 1_000_000) {
+                Ok(n) if n == N => {
                     an.accumulate(&buf);
+                    errors = 0;
                 }
+                Ok(_) => {}
+                Err(_) => errors += 1,
             }
         }
+        if errors > 40 {
+            return Err("repeated read failures (SDR unplugged?)".into());
+        }
         let db = an.render_db();
-        let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, false)));
+        let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, info)));
     }
 }

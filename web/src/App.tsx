@@ -57,6 +57,8 @@ export default function App() {
     <div className="mx-auto flex min-h-full max-w-[1200px] flex-col gap-5 p-4 md:p-6">
       <Header connected={connected} frame={frame} xp={progress.xp} />
 
+      <SdrBanner connected={connected} frame={frame} />
+
       <Tabs
         active={view === "library" ? "library" : "missions"}
         onMissions={() => setView("academy")}
@@ -199,6 +201,44 @@ const LEARN: Record<string, string> = {
   wifi24: "modulations",
   drone: "decoder-vs-detecter",
 };
+
+function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | null }) {
+  if (!connected || !frame) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-edge bg-panel p-4">
+        <span className="text-2xl">🔌</span>
+        <div className="text-sm text-muted">Connexion au moteur RF…</div>
+      </div>
+    );
+  }
+  const s = frame.sdr;
+  if (s.present) {
+    return (
+      <div className="flex items-center gap-4 rounded-2xl border border-phos/40 bg-phos/5 p-4">
+        <span className="text-2xl">📡</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-display font-bold text-phos">{s.label || "SDR"} détecté</div>
+          <div className="truncate font-mono text-xs text-muted">
+            {s.serial ? `n° de série ${s.serial}` : "n° de série indisponible"} · pilote {s.driver}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full border border-phos/40 px-3 py-1 text-xs font-semibold text-phos">EN DIRECT</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-amber/40 bg-amber/5 p-4">
+      <span className="text-2xl">🔌</span>
+      <div className="min-w-0 flex-1">
+        <div className="font-display font-bold text-amber">Aucun SDR détecté</div>
+        <div className="text-xs text-muted">
+          Branche ton HackRF en USB — détection automatique en quelques secondes. En attendant : simulateur.
+        </div>
+      </div>
+      <span className="shrink-0 rounded-full border border-amber/40 px-3 py-1 text-xs font-semibold text-amber">SIMULATEUR</span>
+    </div>
+  );
+}
 
 function Tabs({
   active,
