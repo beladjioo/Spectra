@@ -24,7 +24,7 @@ spec:
       containers:
         - name: rf-academy
           image: ghcr.io/beladjioo/rf-academy:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # raw USB access to the HackRF
           ports:

@@ -9,34 +9,41 @@ on:
       - ".github/workflows/rf-academy.yml"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write   # to bump the manifest image tag (GitOps auto-deploy)
   packages: write
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # native arm64 runner = no qemu emulation → builds in minutes, not ~20 min
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/rf-academy
-          tags: |
-            type=raw,value=latest
-            type=sha,format=short
+      - id: vars
+        run: echo "tag=sha-$(echo ${GITHUB_SHA} | cut -c1-7)" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
-          # arm64 = Raspberry Pi 5. Add linux/amd64 if you also run it on a PC/laptop k3s.
           platforms: linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/rf-academy:latest
+            ghcr.io/${{ github.repository_owner }}/rf-academy:${{ steps.vars.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # GitOps auto-deploy: pin the DaemonSet to the freshly built immutable tag and
+      # commit it. ArgoCD sees the manifest change and rolls it out — no manual
+      # restart. (This commit touches apps/** only, which isn't in the build paths
+      # above, so it doesn't re-trigger this workflow.)
+      - name: bump manifest
+        run: |
+          sed -i -E "s|image: ghcr.io/beladjioo/rf-academy:.*|image: ghcr.io/beladjioo/rf-academy:${{ steps.vars.outputs.tag }}|" apps/rf-academy/daemonset.yaml
+          git config user.name "beladjioo"
+          git config user.email "beladjioo@users.noreply.github.com"
+          git add apps/rf-academy/daemonset.yaml
+          git commit -m "ci: deploy rf-academy:${{ steps.vars.outputs.tag }} [skip ci]" || { echo "nothing to bump"; exit 0; }
+          git push

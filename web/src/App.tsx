@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Spectrum from "./components/Spectrum";
 import Waterfall from "./components/Waterfall";
 import Library from "./components/Library";
+import Console from "./components/Console";
 import { useRf, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE } from "./lib/library";
 import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
@@ -19,7 +20,7 @@ const loadProgress = (): Progress => {
 export default function App() {
   const { connected, frame } = useRf();
   const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [view, setView] = useState<"academy" | "mission" | "library">("academy");
+  const [view, setView] = useState<"academy" | "mission" | "library" | "console">("academy");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [note, setNote] = useState<string>(FIRST_NOTE);
   const [toast, setToast] = useState<string | null>(null);
@@ -60,12 +61,15 @@ export default function App() {
       <SdrBanner connected={connected} frame={frame} />
 
       <Tabs
-        active={view === "library" ? "library" : "missions"}
+        active={view === "library" ? "library" : view === "console" ? "console" : "missions"}
         onMissions={() => setView("academy")}
+        onConsole={() => setView("console")}
         onLibrary={() => setView("library")}
       />
 
-      {view === "library" ? (
+      {view === "console" ? (
+        <Console frame={frame} onLearn={openNote} />
+      ) : view === "library" ? (
         <Library slug={note} onSelect={openNote} onMission={openMissionById} />
       ) : view === "mission" && active ? (
         <MissionView
@@ -243,10 +247,12 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
 function Tabs({
   active,
   onMissions,
+  onConsole,
   onLibrary,
 }: {
-  active: "missions" | "library";
+  active: "missions" | "console" | "library";
   onMissions: () => void;
+  onConsole: () => void;
   onLibrary: () => void;
 }) {
   const cls = (on: boolean) =>
@@ -254,8 +260,9 @@ function Tabs({
       on ? "bg-phos text-ink" : "border border-edge bg-panel text-slate-300 hover:border-phos"
     }`;
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <button className={cls(active === "missions")} onClick={onMissions}>🎯 Missions</button>
+      <button className={cls(active === "console")} onClick={onConsole}>🎛️ Console</button>
       <button className={cls(active === "library")} onClick={onLibrary}>📖 Bibliothèque</button>
     </div>
   );

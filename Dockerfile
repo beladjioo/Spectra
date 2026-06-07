@@ -15,9 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libsoapysdr-dev clang libclang-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# Pre-build dependencies in their own cacheable layer (only re-runs when the
+# Cargo manifests change) — keeps incremental builds fast.
 COPY server/Cargo.toml server/Cargo.lock ./
+RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -rf src
+# Then the real sources (deps stay cached above).
 COPY server/src ./src
-RUN cargo build --release
+RUN touch src/main.rs && cargo build --release
 
 # 3. Runtime: slim image with the HackRF SoapySDR module
 FROM debian:bookworm-slim
