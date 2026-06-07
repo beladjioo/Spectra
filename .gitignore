@@ -27,3 +27,10 @@ captures/
 # Helm / k8s
 charts/*.tgz
 kubeconfig
+target/
+edge/drone-agent/target/
+
+# Node / web build
+node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo

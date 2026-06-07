@@ -1,43 +1,38 @@
-# Spectra — local dev shortcuts. Override REGISTRY/IMAGE to push to your own registry.
-REGISTRY ?= ghcr.io/CHANGEME
-IMAGE    ?= $(REGISTRY)/spectra-edge-agent
-TAG      ?= dev
-PLATFORMS ?= linux/amd64,linux/arm64
+# RF Academy — local dev shortcuts.
 
 .PHONY: help
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-	  awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	  awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: bootstrap
-bootstrap: ## Install ArgoCD on the homelab cluster
-	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-	kubectl -n argocd rollout status deploy/argocd-server
+bootstrap: ## Bootstrap a Pi 5 node (k3s + ArgoCD + app-of-apps + WiFi AP)
+	sudo ./clusters/rf-academy/bootstrap-pi.sh
 
 .PHONY: root-app
 root-app: ## Apply the app-of-apps root Application
-	kubectl apply -f clusters/homelab/root-app.yaml
+	kubectl apply -f clusters/rf-academy/root-app.yaml
 
-.PHONY: edge-build
-edge-build: ## Build the edge agent image (multi-arch)
-	docker buildx build --platform $(PLATFORMS) -t $(IMAGE):$(TAG) edge/agent
+.PHONY: web
+web: ## Build the React UI (type-check + bundle)
+	cd web && npm install && npm run build
 
-.PHONY: edge-push
-edge-push: ## Build and push the edge agent image
-	docker buildx build --push --platform $(PLATFORMS) -t $(IMAGE):$(TAG) edge/agent
+.PHONY: dev
+dev: web ## Run the all-Rust backend locally (HackRF auto-detected; else simulator)
+	cd server && STATIC_DIR=../web/dist cargo run --release
 
-.PHONY: agent-run
-agent-run: ## Run the agent locally against a local config.yaml (needs a HackRF)
-	cd edge/agent && python3 agent.py
+.PHONY: check
+check: ## Type-check the Rust backend (needs libsoapysdr-dev pkg-config clang)
+	cd server && cargo check
+
+.PHONY: image
+image: ## Build the single container image locally
+	docker build -t rf-academy:dev .
 
 .PHONY: lint
-lint: ## Validate kustomize builds and YAML
-	kustomize build apps/mosquitto >/dev/null && echo "mosquitto OK"
-	kustomize build apps/alerting   >/dev/null && echo "alerting OK"
-	kustomize build apps/grafana    >/dev/null && echo "grafana OK"
-	kustomize build edge/flux       >/dev/null && echo "edge OK"
+lint: ## Validate the kustomize build
+	kubectl kustomize apps/rf-academy >/dev/null && echo "rf-academy OK"
 
 .PHONY: validate
-validate: ## Dry-run all ArgoCD Applications against the API server
-	kubectl apply --dry-run=server -R -f clusters/homelab/apps/
+validate: ## Dry-run the ArgoCD Applications against the API server
+	kubectl apply --dry-run=server -R -f clusters/rf-academy/apps/

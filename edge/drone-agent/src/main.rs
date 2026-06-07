@@ -33,6 +33,8 @@ struct Detection {
 #[derive(Serialize)]
 struct Report {
     node_id: String,
+    node_lat: f64, // fixed sensor position (0,0 = unset) — used to place the node on the map
+    node_lon: f64,
     band_center_mhz: f32,
     span_mhz: f32,
     noise_floor_db: f32,
@@ -56,6 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mqtt_port: u16 = env("MQTT_PORT", "1883").parse().unwrap_or(1883);
     let fs: f64 = env("SDR_SAMPLE_RATE", "20000000").parse().unwrap_or(20e6);
     let center: f64 = env("SDR_CENTER_HZ", "2440000000").parse().unwrap_or(2.44e9);
+    let node_lat: f64 = env("SPECTRA_NODE_LAT", "0").parse().unwrap_or(0.0);
+    let node_lon: f64 = env("SPECTRA_NODE_LON", "0").parse().unwrap_or(0.0);
 
     // --- MQTT (drive the event loop in a background thread) ---
     let mut opts = MqttOptions::new(format!("spectra-drone-{node}"), &mqtt_host, mqtt_port);
@@ -151,6 +155,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let report = Report {
             node_id: node.clone(),
+            node_lat,
+            node_lon,
             band_center_mhz: (center / 1e6) as f32,
             span_mhz: (fs / 1e6) as f32,
             noise_floor_db: noise,

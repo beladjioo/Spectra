@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rf-academy
+  namespace: rf-academy
+  labels:
+    app.kubernetes.io/name: rf-academy
+spec:
+  # The product UI — open http://<node-ip>:30920 (or the Pi's own WiFi AP).
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: rf-academy
+  ports:
+    - { name: http, port: 8090, targetPort: 8090, nodePort: 30920 }

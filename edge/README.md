@@ -1,49 +1,20 @@
-# Spectra edge
+# edge/drone-agent — standalone drone detector (reference)
 
-The sensor side: a HackRF on a Raspberry Pi / mini-PC running k3s, with Flux pulling
-this folder so each sensor self-heals from git.
+This is the original Rust drone-presence detector: it reads IQ from a HackRF at a fixed
+2.44 GHz, runs an FFT, flags wideband bursts, and publishes them over MQTT. It is **kept
+as a reference / starting point** — its analysis now lives, generalised into a *tunable*
+spectrum engine, in [`../server/src/dsp.rs`](../server/src/dsp.rs), and the drone is the
+capstone mission of **RF Academy** (the deployed product).
 
-## Hardware
-
-- HackRF One (+ a decent antenna for your target band — 868 MHz here)
-- Raspberry Pi 4/5 (arm64) or any mini-PC (amd64)
-- Stable USB power; the HackRF is power-hungry under continuous sweep
-
-## Bring-up
+It is no longer part of the GitOps deployment (that's `apps/rf-academy/`). Build/run it
+on its own only if you want the dedicated MQTT-publishing agent:
 
 ```bash
-# 1. Install k3s on the sensor node
-curl -sfL https://get.k3s.io | sh -
-
-# 2. Label the node so the DaemonSet schedules here
-kubectl label node "$(hostname)" spectra.io/hackrf=true
-
-# 3. Create the MQTT credentials secret (kept out of git)
-kubectl create namespace spectra-edge
-kubectl -n spectra-edge create secret generic spectra-mqtt-creds \
-  --from-literal=username='sensor-paris-13' \
-  --from-literal=password='REDACTED'
-
-# 4. Install Flux and point it at edge/flux/ in your repo
-flux bootstrap github \
-  --owner=CHANGEME --repository=spectra \
-  --path=edge/flux --personal
+sudo apt-get install -y libsoapysdr-dev pkg-config clang   # for cargo check/build
+cd drone-agent
+cargo build --release
+SPECTRA_NODE_ID=dev MQTT_HOST=127.0.0.1 ./target/release/spectra-drone-agent
 ```
 
-## Verifying the radio locally (no k8s)
-
-```bash
-hackrf_info                     # HackRF detected?
-hackrf_sweep -f 863:870 -1      # one ISM sweep, CSV to stdout
-rtl_433 -d soapy:driver=hackrf -f 868.3M -F json   # decode devices
-```
-
-## Build the agent image
-
-From the repo root: `make edge-build` (multi-arch via buildx).
-
-## Legal note
-
-Spectra is **receive-only**. It never transmits. Passive reception of public RF is
-generally permitted, but decoding/storing some signals (and any retransmission) is
-regulated and jurisdiction-dependent. Know your local rules before deploying.
+Receive-only — it never transmits. Passive RX of public RF is generally permitted, but
+rules are jurisdiction-dependent; know yours before deploying.

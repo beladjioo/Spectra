@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rf-academy-config
+  namespace: rf-academy
+data:
+  # Set to "1" to force the built-in simulator (demo without a HackRF).
+  # Left at "0", the app uses the HackRF and only falls back to sim if it's absent.
+  SDR_SIM: "0"

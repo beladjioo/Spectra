@@ -1,0 +1,24 @@
+# App-of-apps for an RF Academy node (Pi 5 + HackRF, k3s + ArgoCD).
+# ArgoCD pulls this from GitHub and reconciles everything below it — the node is
+# declared in git, nothing is installed by hand.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rf-academy-root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/beladjioo/Spectra.git
+    targetRevision: main
+    path: clusters/rf-academy/apps
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

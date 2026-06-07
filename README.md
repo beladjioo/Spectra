@@ -1,78 +1,88 @@
-# Spectra — RF & IoT Observability for Smart Cities
+# RF Academy — Learn RF by doing, with a HackRF (all-Rust, GitOps)
 
-> Passive radio-frequency monitoring platform. A HackRF-powered edge sensor listens
-> to the urban ISM bands, decodes active IoT devices, measures spectrum occupancy and
-> the noise floor, and detects interference — all streamed into a GitOps-managed,
-> cloud-native stack.
+> A gamified "HackRF bible": plug in the SDR and progress through missions that
+> teach you radio by *doing* it — read a spectrum, catch an FM station, surprise an
+> IoT burst on 868 MHz, survive the 2.4 GHz chaos, and (capstone) detect a drone.
+> The whole RF engine and backend are written in **Rust**; the UI is React. Each
+> node is a self-contained k3s box managed by **ArgoCD pulling this repo** — nothing
+> is installed by hand.
 
-**Core use case (MVP):** *ISM interference detection & IoT network health.*
-Operators of LoRaWAN / 433–868 MHz sensor fleets (smart parking, waste, metering,
-weather) need to know **why a sensor goes silent**. Spectra sees the RF noise their
-sensors cannot, and turns "the band is congested at 868.3 MHz" into an actionable alert.
+Passive, **receive-only** — the HackRF only ever listens; nothing is transmitted.
 
-## Why this project
+## Why
 
-- **Showcase**: SDR + edge computing + Kubernetes + GitOps + full-stack observability.
-- **Future-proof**: spectrum monitoring is a growing market (massive IoT, 5G, GPS/drone
-  jamming, regulatory pressure).
-- **Sellable**: naturally multi-tenant — one edge sensor + one dashboard per customer.
-- **Open core**: the agent, decoders and Helm charts are OSS; the multi-tenant SaaS layer
-  stays commercial.
+- **RF is intimidating.** Most SDR tools throw a wall of knobs at you. RF Academy is a
+  guided, gamified path from "what is a dB?" to "I detected a drone."
+- **All-Rust engine.** The FFT/feature DSP runs comfortably on a Pi 5 CPU (no GPU),
+  generalised from a real drone-detection agent into a *tunable* spectrum analyser.
+- **GitOps to the edge.** One image, declared in git, reconciled by ArgoCD. Reproducible,
+  and it runs with no internet once pulled.
 
-## Architecture (high level)
+## Architecture — one image, one binary
 
 ```
-EDGE (HackRF + RPi/mini-PC, k3s + Flux)
-  hackrf_sweep ──▶ ISM band occupancy / noise floor
-  rtl_433 (SoapySDR/HackRF) ──▶ decoded device events
-        │ MQTT over TLS
-        ▼
-CLUSTER (k3s homelab, ArgoCD app-of-apps)
-  Mosquitto ──▶ Telegraf (ingest) ──▶ VictoriaMetrics ──▶ Grafana
-                                          │
-                                      vmalert ──▶ Alertmanager (interference alerts)
+EDGE NODE (Pi 5 + HackRF, k3s + ArgoCD)
+  rf-academy  (Rust, DaemonSet, privileged USB)
+     ┌──────────────────────────────────────────────┐
+     │ HackRF (tunable) → rustfft → spectrum/features │  ← POST /api/tune (per mission)
+     │ axum: serves the React UI + streams /ws        │
+     └──────────────────────────────────────────────┘
+        :8090  →  NodePort 30920
+  React UI (baked into the image): missions, XP/levels, live spectrum + waterfall
 ```
 
-Git is the single source of truth. ArgoCD reconciles the cluster; Flux reconciles edge
-sensors (pull-based, NAT-friendly).
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the detailed design.
+No MQTT, no separate gateway, no nginx — the single Rust binary owns the radio, runs the
+DSP, and serves the UI. If no HackRF is present it falls back to a **built-in simulator**,
+so the app always runs (great for demos and CI).
 
 ## Repository layout
 
 ```
 .
-├── docs/                  # Architecture, runbooks, decisions
-├── edge/                  # HackRF edge agent (container) + edge GitOps (Flux)
-│   ├── agent/             # Python agent: sweep + decode → MQTT
-│   └── flux/              # Kustomization deployed on each sensor
-├── apps/                  # ArgoCD Applications (one folder per platform component)
-│   ├── mosquitto/
-│   ├── victoriametrics/
-│   ├── telegraf/
-│   ├── grafana/
-│   └── alerting/
-├── clusters/
-│   └── homelab/           # Bootstrap + app-of-apps root for the central cluster
-└── Makefile               # Local dev shortcuts
+├── server/            # the all-Rust backend (axum + tokio + rustfft + soapysdr)
+│   └── src/dsp.rs     # tunable spectrum analyser (drone detection generalised)
+├── web/               # React + Tailwind UI: missions, spectrum, waterfall
+├── Dockerfile         # one image: build UI → build Rust → runtime (HackRF SoapySDR)
+├── apps/rf-academy/   # k8s: namespace + configmap + DaemonSet + NodePort
+├── clusters/rf-academy/  # ArgoCD app-of-apps + per-node bootstrap (bootstrap-pi.sh)
+├── edge/drone-agent/  # standalone drone detector (kept as reference; folded into server/)
+└── docs/ARCHITECTURE.md
 ```
 
-## Quick start
+## Deploy (GitOps — the real path)
 
 ```bash
-# 0. Prerequisites: a k3s cluster, kubectl, helm, argocd CLI, and a HackRF on the edge.
-make bootstrap        # install ArgoCD on the homelab cluster
-make root-app         # apply the app-of-apps root Application
-make edge-build       # build the edge agent container image
+# On a fresh Pi 5 (arm64), HackRF plugged in over USB:
+sudo ./clusters/rf-academy/bootstrap-pi.sh
+# installs k3s + ArgoCD, labels the node, applies the app-of-apps.
+# ArgoCD then pulls ghcr.io/beladjioo/rf-academy and runs it.
 ```
 
-Then point your browser at Grafana (see `apps/grafana/`) and watch the ISM band.
+Open the UI from your phone/laptop:
 
-## Status
+- Normal LAN: `http://<pi-ip>:30920` or `http://<hostname>.local:30920`
+- **White zone** (no cell): the bootstrap also makes the Pi its own WiFi AP (SSID
+  `RF-Academy`, on **5 GHz** so it doesn't jam the 2.4 GHz HackRF) → join it and open
+  `http://10.42.0.1:30920`. Updates come via ethernet or `nmcli con down rf-academy-ap`.
 
-🚧 Scaffold. Components are wired but values/secrets are placeholders — see the TODOs in
-each `apps/*/` folder and in `edge/agent/config.example.yaml`.
+## Local dev (sanity check only — not the deployment)
+
+```bash
+cd web && npm install && npm run build
+cd ../server && STATIC_DIR=../web/dist cargo run --release   # HackRF auto-detected; else sim
+# → http://localhost:8090
+```
+
+## The curriculum
+
+| Mission | Band | You learn |
+|---|---|---|
+| 📡 Premier contact | FM 98 MHz | spectrum, noise floor, dB, gain |
+| 📻 Capter une radio FM | FM 100.2 | carriers, SNR, FM modulation |
+| 📶 ISM 868 | 868.3 MHz | IoT/LoRa bursts, duty-cycle |
+| 🌐 Le chaos du 2.4 GHz | 2.44 GHz | WiFi/BT, OFDM, occupancy |
+| 🚁 Capstone: drone | 2.44 GHz | wideband video link detection |
 
 ## License
 
-OSS core under Apache-2.0 (see `LICENSE`). Commercial multi-tenant layer is out of tree.
+Apache-2.0 (see `LICENSE`).

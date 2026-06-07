@@ -1,99 +1,100 @@
-# Spectra — Architecture
+# RF Academy — Architecture
 
-## 1. Problem & value
+## 1. What it is
 
-Smart-city sensor fleets (LoRaWAN, 433/868/915 MHz SRD) fail silently. The usual
-telemetry tells you *that* a sensor stopped reporting, never *why*. The "why" is often
-**RF**: a new interferer, a congested sub-band, a rising noise floor. Spectra adds a
-passive SDR ear that sees the radio environment the sensors live in.
+A gamified, hands-on RF learning tool built around a HackRF. The user progresses through
+**missions**, each of which teaches one band/concept and asks them to spot it live. The
+whole RF engine + backend are **Rust**; the UI is React. Each node is a single k3s box
+reconciled by ArgoCD from this repo.
 
-**MVP value proposition:** *ISM interference detection & IoT network health.*
+## 2. One binary, one image
 
-## 2. Topology
+Everything the node runs is one Rust binary (`rf-academy`) with the built React UI baked
+into its image:
 
 ```
-                     ┌──────────────────────────────────────────┐
-   EDGE (per site)   │  k3s node + HackRF One                    │
-                     │  ┌─────────────────────────────────────┐  │
-                     │  │ spectra-agent (DaemonSet, privileged)│  │
-                     │  │   hackrf_sweep  → occupancy/noise    │  │
-                     │  │   rtl_433       → decoded devices    │  │
-                     │  └───────────────┬─────────────────────┘  │
-                     │   Flux pulls edge/flux/ from git          │
-                     └───────────────────┼──────────────────────┘
-                                         │ MQTT/TLS (8883)
-                     ┌───────────────────▼──────────────────────┐
-   CENTRAL (homelab) │  k3s + ArgoCD (app-of-apps)               │
-                     │  Mosquitto → Telegraf → VictoriaMetrics   │
-                     │                              │            │
-                     │                          vmalert ─▶ alerts│
-                     │  Grafana ◀── VictoriaMetrics              │
-                     └──────────────────────────────────────────┘
-                          ▲ ArgoCD reconciles from git (push-free)
+                 ┌──────────────────────────────────────────────┐
+  EDGE NODE      │  Raspberry Pi 5 + HackRF One                  │
+  (per learner)  │  k3s (single node) + ArgoCD                   │
+                 │  ┌────────────────────────────────────────┐  │
+                 │  │ rf-academy (Rust, DaemonSet, priv USB)  │  │
+                 │  │                                         │  │
+                 │  │  SDR thread ── soapysdr (tunable)       │  │
+                 │  │     │  IQ @ commanded center/rate/gain  │  │
+                 │  │     ▼  rustfft → dB spectrum            │  │
+                 │  │     ▼  feature extraction (dsp.rs)      │  │
+                 │  │  broadcast ──▶ axum WS  /ws             │  │
+                 │  │  axum REST  ◀── POST /api/tune          │  │
+                 │  │  axum static ── serves /app/web (React) │  │
+                 │  └──────────────────┬─────────────────────┘  │
+                 │            :8090  →  NodePort 30920           │
+                 └───────────────────────────────────────────────┘
+                      ▲ ArgoCD reconciles the node from git
 ```
 
-## 3. Data flow & schema
+No MQTT, no separate gateway, no nginx — collapsed into the single binary. The browser
+(phone/laptop on the LAN or the Pi's own WiFi AP) is the only external piece, and it only
+reads + sends tune commands.
 
-The agent publishes line-delimited JSON to MQTT:
+## 3. The Rust backend (`server/`)
 
-| Topic                      | Producer       | Key fields |
-|----------------------------|----------------|------------|
-| `spectra/<sensor>/sweep`   | `hackrf_sweep` | `noise_floor_db`, `peak_db`, `occupancy_ratio`, `interference`, `bins[]` |
-| `spectra/<sensor>/devices` | `rtl_433`      | `decode{model, id, rssi, snr, …}` |
+- **`src/dsp.rs`** — the analysis core, generalised from the drone-detection agent into a
+  *tunable, mode-agnostic* spectrum analyser:
+  1. `Analyzer` averages FFT power frames from live IQ (N=4096), fftshifts to DC, → dB.
+  2. `extract` computes the noise floor (20th percentile), threshold = noise + SNR, finds
+     contiguous occupied bands as `peaks` (each flagged `wideband` if ≥5 MHz ≈ a drone
+     video link), the occupancy ratio, and a 256-point trace for the UI.
+  3. A built-in **simulator** (`synth`) generates a believable per-band spectrum so the
+     app works with no HackRF (forced by `SDR_SIM=1`, or automatic fallback if the radio
+     is absent).
+- **`src/main.rs`** — a blocking SDR thread owns the HackRF and applies retune commands
+  from the UI (`tokio::mpsc`); analysed frames go out on a `tokio::broadcast` channel.
+  `axum` serves: `GET /ws` (frame stream), `POST /api/tune`, `/healthz`, and the static
+  React build (`ServeDir`). Receive-only — nothing is transmitted.
 
-Telegraf's `json_v2` parser maps these into VictoriaMetrics measurements
-(`rf_sweep_*`, `rf_devices_*`) tagged by `sensor_id`. Retention: 3 months (homelab),
-tune per tenant in production.
+Rust (not Python) because the FFT + per-bin scan must keep up with a multi-MHz stream on
+the Pi 5 CPU, and one static binary is the simplest thing to ship.
 
-## 4. GitOps model
+## 4. The UI (`web/`, React + Tailwind)
 
-- **Single source of truth**: this repo.
-- **Central cluster**: ArgoCD app-of-apps. `clusters/homelab/root-app.yaml` watches
-  `clusters/homelab/apps/`; each child Application is a platform component. Adding a
-  component = committing a manifest.
-- **Edge**: Flux (pull-based, NAT-friendly) reconciles `edge/flux/` on each sensor.
-  Sensors self-heal and converge without inbound connectivity.
-- **Secrets**: never in git. sealed-secrets or SOPS+age. Placeholders are flagged with
-  `CHANGEME` / `TODO` throughout.
+- `lib/useRf.ts` — WebSocket hook exposing the latest `Frame`, plus `tune()`.
+- `missions.ts` — the curriculum: each mission has a band (→ `tune`), an objective
+  evaluated against the live frame (`objectiveMet`), bible text, and XP.
+- `components/Spectrum.tsx` (live FFT, peaks shaded) and `Waterfall.tsx` (canvas
+  time-axis colormap).
+- `App.tsx` — the gamified shell: XP/levels, mission grid with lock/unlock, and a mission
+  view that tunes the radio, shows the bible, auto-validates the objective when the signal
+  holds, and awards XP. Progress is stored in `localStorage`.
 
-## 5. Interference detection logic
+## 5. The curriculum
 
-1. Each sweep computes a robust noise floor (~10th percentile of per-bin power) and an
-   occupancy ratio (fraction of bins above threshold).
-2. `interference` is raised when the noise floor crosses a **site-calibrated** baseline.
-3. vmalert turns sustained interference, fast noise-floor rises, and sensor silence into
-   actionable alerts (`apps/alerting/rules.yaml`).
+| Mission | Band | Objective (evaluated on the live frame) |
+|---|---|---|
+| Premier contact | FM 98 MHz | observe the noise floor (manual validate) |
+| Capter une radio FM | FM 100.2 | a narrowband peak with SNR ≥ 18 dB |
+| ISM 868 | 868.3 MHz | catch any burst (a peak appears) |
+| Le chaos du 2.4 GHz | 2.44 GHz | occupancy ≥ 4 % |
+| Capstone: drone | 2.44 GHz | a wideband (≥5 MHz) emission |
 
-> Calibration matters: the dB scale from `hackrf_sweep` is relative and gain-dependent.
-> Establish a quiet-baseline per site before trusting absolute thresholds.
+## 6. GitOps model
 
-## 6. Roadmap
+- **Single source of truth**: this repo. One deployable: `apps/rf-academy/` (kustomize:
+  namespace + configmap + DaemonSet + NodePort).
+- **Per node**: `clusters/rf-academy/root-app.yaml` is an ArgoCD app-of-apps pointing at
+  `clusters/rf-academy/apps/`, which references `apps/rf-academy`. ArgoCD self-heals and
+  prunes.
+- **Onboarding**: flash a Pi, run `clusters/rf-academy/bootstrap-pi.sh` (k3s + ArgoCD +
+  node label `spectra.io/hackrf=true` + root-app + a 5 GHz WiFi AP for white-zone access).
+- **Image**: the `Dockerfile` builds the UI, then the Rust binary, then a slim runtime
+  with the HackRF SoapySDR module; CI (`.github/workflows/rf-academy.yml`) pushes
+  `ghcr.io/beladjioo/rf-academy` (arm64 for the Pi).
 
-**M0 — Scaffold (done):** repo, agent, GitOps wiring, starter dashboard + alerts.
+## 7. Honest scope
 
-**M1 — Single sensor, real data:** calibrate, validate decode rates, refine thresholds,
-add a `bins[]`→heatmap (waterfall) panel.
-
-**M2 — Multi-sensor fleet:** per-sensor onboarding flow, fleet health view, sealed-secrets.
-
-**M3 — Productisation (open core):**
-- Multi-tenant isolation (namespace-per-tenant, per-tenant MQTT auth/ACL).
-- Onboarding API + provisioning of edge images.
-- SLA reporting / exportable "spectrum health" PDFs for customers.
-- Optional: cloud control plane (hybrid) while edge stays on-prem.
-
-**Possible extensions** (separate, reusing the same pipeline): ADS-B/AIS mobility,
-GPS-jamming detection, rogue-transmitter geolocation with ≥2 sensors (TDoA).
-
-## 7. Why these technology choices
-
-| Concern        | Choice              | Rationale |
-|----------------|---------------------|-----------|
-| Edge GitOps    | Flux                | Light, pull-based, works behind NAT |
-| Central GitOps | ArgoCD              | Great UI for demos; app-of-apps scales cleanly |
-| Bus            | Mosquitto/MQTT      | The IoT lingua franca; trivial on the edge |
-| Ingest         | Telegraf            | Native MQTT + flexible JSON parsing, no custom code |
-| TSDB           | VictoriaMetrics     | Cheap, fast, Prometheus-compatible, single-binary |
-| Viz/alerts     | Grafana + vmalert   | Standard, provisioned-as-code |
-| Decode         | rtl_433 + SoapySDR  | Huge device coverage, HackRF-compatible |
-| Spectrum       | hackrf_sweep        | First-party, reliable wideband power sweep |
+- Mission detection is **presence/feature based**, not full decoding. The drone capstone
+  flags wideband energy; WiFi/BT can also trigger it (signature discrimination + Remote ID
+  decode are future work). The standalone `edge/drone-agent` is kept as the original
+  reference; its logic now lives, generalised, in `server/src/dsp.rs`.
+- The simulator is for learning/demo without hardware; on a real HackRF the same code path
+  analyses real IQ. dB values are relative and gain-dependent — good for *seeing* signals,
+  not for calibrated measurements.
