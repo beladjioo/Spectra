@@ -14,6 +14,7 @@ use serde::Serialize;
 
 pub const N: usize = 4096; // FFT size
 pub const OUT_BINS: usize = 256; // spectrum points sent to the UI
+pub const AUDIO_RATE: f64 = 48000.0; // demodulated audio sample rate
 const SNR_DB: f32 = 8.0; // a bin is "occupied" above noise + SNR_DB
 const WIDEBAND_MHZ: f32 = 5.0; // a band this wide ≈ an OFDM video link (drone)
 
@@ -164,6 +165,29 @@ pub fn extract(db: &[f32], center_hz: f64, fs: f64, gain_db: f64, sdr: &SdrInfo)
         sdr: sdr.clone(),
         ts: now_ts(),
     }
+}
+
+/// FM-demodulate IQ whose carrier sits at DC (we tune the radio onto the station),
+/// then boxcar-low-pass + decimate down to `AUDIO_RATE`. Returns mono PCM ~[-1, 1].
+/// `last` carries the previous sample across calls for a continuous phase.
+pub fn fm_demod(iq: &[Complex<f32>], fs: f64, last: &mut Complex<f32>) -> Vec<f32> {
+    let decim = (fs / AUDIO_RATE).max(1.0) as usize;
+    let gain = 1.0 / std::f32::consts::PI; // normalise phase step to ~[-1, 1]
+    let mut out = Vec::with_capacity(iq.len() / decim + 1);
+    let mut acc = 0f32;
+    let mut cnt = 0usize;
+    for &s in iq {
+        let p = s * last.conj(); // instantaneous freq = arg(s · conj(prev))
+        *last = s;
+        acc += p.im.atan2(p.re) * gain;
+        cnt += 1;
+        if cnt >= decim {
+            out.push((acc / cnt as f32).clamp(-1.0, 1.0)); // boxcar LPF + decimate
+            acc = 0.0;
+            cnt = 0;
+        }
+    }
+    out
 }
 
 // ---------------------------------------------------------------------------

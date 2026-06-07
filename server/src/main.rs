@@ -9,13 +9,14 @@
 
 mod dsp;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Query, State,
     },
     response::IntoResponse,
     routing::{get, post},
@@ -26,7 +27,7 @@ use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::services::{ServeDir, ServeFile};
 
-use dsp::{extract, synth, Analyzer, Frame, Rng, SdrInfo, N};
+use dsp::{extract, fm_demod, synth, Analyzer, Frame, Rng, SdrInfo, AUDIO_RATE, N};
 
 /// Current radio tuning, pushed from the web UI to the SDR thread.
 #[derive(Clone, Copy)]
@@ -47,6 +48,17 @@ struct TuneReq {
 struct AppState {
     frames: broadcast::Sender<Arc<Frame>>,
     cmds: mpsc::UnboundedSender<Tune>,
+    audio: broadcast::Sender<Vec<u8>>, // i16 LE PCM @ AUDIO_RATE
+    audio_on: Arc<AtomicBool>,
+}
+
+/// f32 PCM [-1,1] → little-endian i16 bytes for the browser's Web Audio.
+fn pcm_bytes(pcm: &[f32]) -> Vec<u8> {
+    let mut b = Vec::with_capacity(pcm.len() * 2);
+    for &s in pcm {
+        b.extend_from_slice(&((s.clamp(-1.0, 1.0) * 32767.0) as i16).to_le_bytes());
+    }
+    b
 }
 
 fn env(k: &str, d: &str) -> String {
@@ -61,20 +73,26 @@ async fn main() {
 
     let (frame_tx, _) = broadcast::channel::<Arc<Frame>>(16);
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<Tune>();
+    let (audio_tx, _) = broadcast::channel::<Vec<u8>>(32);
+    let audio_on = Arc::new(AtomicBool::new(false));
 
     // start tuned to the FM band (mission 1 territory)
     let init = Tune { center_hz: 98.0e6, fs: 8.0e6, gain: 32.0 };
     {
         let frames = frame_tx.clone();
-        std::thread::spawn(move || sdr_loop(sim, frames, cmd_rx, init));
+        let audio = audio_tx.clone();
+        let on = audio_on.clone();
+        std::thread::spawn(move || sdr_loop(sim, frames, cmd_rx, init, audio, on));
     }
 
-    let state = AppState { frames: frame_tx, cmds: cmd_tx };
+    let state = AppState { frames: frame_tx, cmds: cmd_tx, audio: audio_tx, audio_on };
     let index = format!("{static_dir}/index.html");
     let serve = ServeDir::new(&static_dir).fallback(ServeFile::new(index));
     let app = Router::new()
         .route("/ws", get(ws_handler))
+        .route("/audio", get(audio_handler))
         .route("/api/tune", post(tune))
+        .route("/api/audio", post(set_audio))
         .route("/healthz", get(|| async { "ok" }))
         .fallback_service(serve)
         .with_state(state);
@@ -92,6 +110,35 @@ async fn tune(State(s): State<AppState>, Json(r): Json<TuneReq>) -> impl IntoRes
     };
     let _ = s.cmds.send(cmd);
     Json(serde_json::json!({ "ok": true }))
+}
+
+#[derive(Deserialize)]
+struct AudioReq {
+    on: bool,
+}
+
+async fn set_audio(State(s): State<AppState>, Query(q): Query<AudioReq>) -> impl IntoResponse {
+    s.audio_on.store(q.on, Ordering::Relaxed);
+    Json(serde_json::json!({ "on": q.on }))
+}
+
+async fn audio_handler(ws: WebSocketUpgrade, State(s): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |sock| audio_task(sock, s))
+}
+
+async fn audio_task(mut sock: WebSocket, s: AppState) {
+    let mut rx = s.audio.subscribe();
+    loop {
+        match rx.recv().await {
+            Ok(bytes) => {
+                if sock.send(Message::Binary(bytes)).await.is_err() {
+                    break;
+                }
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Closed) => break,
+        }
+    }
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(s): State<AppState>) -> impl IntoResponse {
@@ -126,13 +173,15 @@ fn sdr_loop(
     frames: broadcast::Sender<Arc<Frame>>,
     mut cmds: mpsc::UnboundedReceiver<Tune>,
     init: Tune,
+    audio: broadcast::Sender<Vec<u8>>,
+    audio_on: Arc<AtomicBool>,
 ) {
     let mut cur = init;
     loop {
         if !sim_forced {
             if let Some((args, info)) = probe() {
                 eprintln!("SDR detected: {} (serial {})", info.label, info.serial);
-                if let Err(e) = real_loop(&frames, &mut cmds, &mut cur, args, &info) {
+                if let Err(e) = real_loop(&frames, &mut cmds, &mut cur, args, &info, &audio, &audio_on) {
                     eprintln!("SDR lost ({e}) — back to simulator, will keep scanning");
                 }
             }
@@ -145,7 +194,7 @@ fn sdr_loop(
             label: "Simulateur".into(),
             serial: String::new(),
         };
-        sim_loop(&frames, &mut cmds, &mut cur, &sim, sim_forced);
+        sim_loop(&frames, &mut cmds, &mut cur, &sim, sim_forced, &audio, &audio_on);
     }
 }
 
@@ -169,8 +218,11 @@ fn sim_loop(
     cur: &mut Tune,
     info: &SdrInfo,
     forever: bool,
+    audio: &broadcast::Sender<Vec<u8>>,
+    audio_on: &AtomicBool,
 ) {
     let mut rng = Rng::new(0xC0FFEE);
+    let mut ph = 0f32;
     let start = std::time::Instant::now();
     loop {
         while let Ok(c) = cmds.try_recv() {
@@ -178,6 +230,17 @@ fn sim_loop(
         }
         let db = synth(cur.center_hz, cur.fs, &mut rng);
         let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, info)));
+        if audio_on.load(Ordering::Relaxed) {
+            // 440 Hz test tone so the audio path can be validated without a HackRF
+            let n = (AUDIO_RATE * 0.12) as usize;
+            let step = std::f32::consts::TAU * 440.0 / AUDIO_RATE as f32;
+            let mut pcm = Vec::with_capacity(n);
+            for _ in 0..n {
+                pcm.push(ph.sin() * 0.2);
+                ph = (ph + step) % std::f32::consts::TAU;
+            }
+            let _ = audio.send(pcm_bytes(&pcm));
+        }
         std::thread::sleep(Duration::from_millis(120));
         if !forever && start.elapsed() >= Duration::from_secs(3) {
             return; // rescan for a hot-plugged SDR
@@ -191,6 +254,8 @@ fn real_loop(
     cur: &mut Tune,
     args: soapysdr::Args,
     info: &SdrInfo,
+    audio: &broadcast::Sender<Vec<u8>>,
+    audio_on: &AtomicBool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use soapysdr::Direction::Rx;
 
@@ -203,6 +268,7 @@ fn real_loop(
 
     let mut an = Analyzer::new();
     let mut buf = vec![Complex::new(0.0f32, 0.0); N];
+    let mut last = Complex::new(0.0f32, 0.0); // FM demod state across blocks
     const AVG: usize = 16;
     let mut errors = 0u32;
 
@@ -217,11 +283,16 @@ fn real_loop(
                 let _ = dev.set_sample_rate(Rx, 0, cur.fs);
             }
         }
+        let listen = audio_on.load(Ordering::Relaxed);
         for _ in 0..AVG {
             match stream.read(&mut [&mut buf], 1_000_000) {
                 Ok(n) if n == N => {
                     an.accumulate(&buf);
                     errors = 0;
+                    if listen {
+                        let pcm = fm_demod(&buf, cur.fs, &mut last);
+                        let _ = audio.send(pcm_bytes(&pcm));
+                    }
                 }
                 Ok(_) => {}
                 Err(_) => errors += 1,

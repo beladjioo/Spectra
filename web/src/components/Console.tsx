@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Spectrum from "./Spectrum";
 import Waterfall from "./Waterfall";
 import { tune, type Frame } from "../lib/useRf";
@@ -25,11 +25,54 @@ export default function Console({
   const [mhz, setMhz] = useState(100.2);
   const [sr, setSr] = useState(8);
   const [gain, setGain] = useState(32);
+  const [listening, setListening] = useState(false);
+  const audioRef = useRef<{ ctx: AudioContext; ws: WebSocket; next: number } | null>(null);
 
   // push tuning to the radio whenever a control changes
   useEffect(() => {
     tune(mhz, sr, gain);
   }, [mhz, sr, gain]);
+
+  const stopAudio = () => {
+    fetch("/api/audio?on=false", { method: "POST" }).catch(() => {});
+    const a = audioRef.current;
+    if (a) {
+      a.ws.close();
+      a.ctx.close().catch(() => {});
+      audioRef.current = null;
+    }
+    setListening(false);
+  };
+
+  const startAudio = () => {
+    const ctx = new AudioContext();
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/audio`);
+    ws.binaryType = "arraybuffer";
+    const st = { ctx, ws, next: 0 };
+    audioRef.current = st;
+    ws.onopen = () => fetch("/api/audio?on=true", { method: "POST" }).catch(() => {});
+    ws.onmessage = (e) => {
+      const i16 = new Int16Array(e.data as ArrayBuffer);
+      if (!i16.length) return;
+      const buf = ctx.createBuffer(1, i16.length, 48000);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      const t = Math.max(st.next, ctx.currentTime + 0.05); // small lead to avoid underruns
+      src.start(t);
+      st.next = t + buf.duration;
+    };
+    ws.onclose = () => {
+      if (audioRef.current === st) stopAudio();
+    };
+    setListening(true);
+  };
+
+  // stop audio when leaving the console
+  useEffect(() => () => stopAudio(), []); // eslint-disable-line
 
   const setFreq = (v: number) => setMhz(Math.min(6000, Math.max(1, +v.toFixed(3))));
   const strongest = frame?.peaks?.[0];
@@ -66,6 +109,17 @@ export default function Console({
               </button>
             ))}
           </div>
+          <button
+            onClick={listening ? stopAudio : startAudio}
+            className={`mt-3 w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+              listening ? "bg-rose-500 text-white" : "bg-phos text-ink"
+            }`}
+          >
+            {listening ? "■ Arrêter l'écoute" : "🔊 Écouter (démodulation FM)"}
+          </button>
+          <p className="mt-1 text-xs text-muted">
+            Idéal sur une station FM (88–108 MHz). Sans HackRF, une tonalité de test confirme l'audio.
+          </p>
         </section>
 
         {/* spectrum + waterfall */}
