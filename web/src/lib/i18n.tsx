@@ -275,6 +275,15 @@ export const STR = {
     },
   },
 
+  donate: {
+    support: { fr: "Soutenir", en: "Support" },
+    modalHint: {
+      fr: "Pas de clé ? Le projet vit aussi de vos dons :",
+      en: "No key? The project also lives on donations:",
+    },
+    coffee: { fr: "☕ Offrir un café", en: "☕ Buy me a coffee" },
+  },
+
   toast: {
     xp: { fr: "XP", en: "XP" },
   },

@@ -9,6 +9,7 @@ import AircraftTable from "./components/Aircraft";
 import { useRf, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE } from "./lib/library";
 import { activate, isPro } from "./lib/license";
+import { DONATE_URL } from "./lib/links";
 import { useI18n, STR, type Locale } from "./lib/i18n";
 import { markRead, readSlugs } from "./journey";
 import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
@@ -137,6 +138,9 @@ export default function App() {
             {t(STR.pro.upgrade)}
           </button>
         )}
+        <a href={DONATE_URL} target="_blank" rel="noreferrer" className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
+          {t(STR.donate.coffee)}
+        </a>
       </footer>
 
       {showUpgrade && (
@@ -220,6 +224,14 @@ function Header({
           <span className="hidden rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted lg:inline">
             🛡️ {t(STR.status.passive)}
           </span>
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-edge bg-panel px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-phos hover:text-phos"
+          >
+            ☕ {t(STR.donate.support)}
+          </a>
           {pro ? (
             <span className="rounded-full border border-amber/50 bg-amber/10 px-3 py-1.5 text-xs font-bold text-amber">
               PRO
@@ -563,6 +575,12 @@ function UpgradeModal({ onClose, onActivated }: { onClose: () => void; onActivat
             {t(STR.pro.activate)}
           </button>
         </div>
+        <p className="mt-4 border-t border-edge/60 pt-3 text-center text-xs text-muted">
+          {t(STR.donate.modalHint)}{" "}
+          <a href={DONATE_URL} target="_blank" rel="noreferrer" className="font-semibold text-phos hover:underline">
+            {t(STR.donate.coffee)}
+          </a>
+        </p>
       </div>
     </div>
   );
