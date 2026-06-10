@@ -195,9 +195,27 @@ function Header({
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-2 rounded-full border border-edge bg-panel px-3 py-1.5 font-mono text-[11px] text-muted md:flex">
-            <span className={`h-2 w-2 rounded-full ${connected ? "animate-pulse-dot bg-phos" : "bg-rose-500"}`} />
-            {connected ? (frame?.sim ? t(STR.status.sim) : t(STR.status.live)) : t(STR.status.offline)}
+          {/* always-visible source indicator: amber = simulator, green = real SDR */}
+          <span
+            className={`flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[11px] font-semibold ${
+              !connected
+                ? "border-rose-500/50 bg-rose-500/10 text-rose-400"
+                : frame?.sim
+                  ? "border-amber/50 bg-amber/10 text-amber"
+                  : "border-phos/50 bg-phos/10 text-phos"
+            }`}
+            title={frame?.sdr.serial ? `${t(STR.sdr.serial)} ${frame.sdr.serial}` : undefined}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                !connected ? "bg-rose-500" : frame?.sim ? "bg-amber" : "animate-pulse-dot bg-phos"
+              }`}
+            />
+            {!connected
+              ? t(STR.status.offline)
+              : frame?.sim
+                ? `🔌 ${t(STR.status.sim)}`
+                : `📡 ${frame?.sdr.label || "SDR"} · ${t(STR.status.live)}`}
           </span>
           <span className="hidden rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted lg:inline">
             🛡️ {t(STR.status.passive)}
