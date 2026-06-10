@@ -8,6 +8,20 @@ export type Peak = {
   wideband: boolean;
 };
 
+/** One ADS-B aircraft track decoded by the backend (1090 MHz). */
+export type Aircraft = {
+  icao: string;
+  callsign: string | null;
+  alt_ft: number | null;
+  speed_kt: number | null;
+  track_deg: number | null;
+  vrate_fpm: number | null;
+  lat: number | null;
+  lon: number | null;
+  msgs: number;
+  age_s: number;
+};
+
 /** One analysed spectrum frame from the Rust backend (WS /ws). */
 export type Frame = {
   center_mhz: number;
@@ -22,6 +36,8 @@ export type Frame = {
   bins: number[];
   sim: boolean;
   sdr: { present: boolean; driver: string; label: string; serial: string };
+  audio_rate: number;
+  aircraft: Aircraft[];
   ts: number;
 };
 

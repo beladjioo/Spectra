@@ -14,9 +14,13 @@ use serde::Serialize;
 
 pub const N: usize = 4096; // FFT size
 pub const OUT_BINS: usize = 256; // spectrum points sent to the UI
-pub const AUDIO_RATE: f64 = 48000.0; // demodulated audio sample rate
 const SNR_DB: f32 = 8.0; // a bin is "occupied" above noise + SNR_DB
 const WIDEBAND_MHZ: f32 = 5.0; // a band this wide ≈ an OFDM video link (drone)
+
+const FM_IF_RATE: f64 = 240e3; // intermediate rate the IQ is decimated to before demod
+const FM_AUDIO_TARGET: f64 = 48e3; // target audio rate (actual rate depends on fs)
+const FM_DEVIATION_HZ: f32 = 75e3; // broadcast FM deviation, used to normalise audio
+const DEEMPHASIS_S: f32 = 50e-6; // European FM de-emphasis time constant
 
 /// Which SDR is currently feeding the app (or none → simulator).
 #[derive(Clone, Default, Serialize)]
@@ -51,6 +55,8 @@ pub struct Frame {
     pub bins: Vec<f32>, // OUT_BINS dB points
     pub sim: bool, // true when no real SDR is connected (simulator running)
     pub sdr: SdrInfo,
+    pub audio_rate: f32, // actual PCM rate of the /audio stream at this fs
+    pub aircraft: Vec<crate::adsb::Aircraft>, // ADS-B tracks (1090 MHz only)
     pub ts: f64,
 }
 
@@ -59,20 +65,30 @@ fn now_ts() -> f64 {
 }
 
 /// Averages FFT power frames from live IQ, then renders a dB spectrum.
+/// A Hann window is applied before each FFT to keep strong carriers from
+/// leaking across the whole span (we *teach* spectrum reading — leakage lies).
 pub struct Analyzer {
     fft: Arc<dyn Fft<f32>>,
     acc: Vec<f32>,
     scratch: Vec<Complex<f32>>,
+    window: Vec<f32>,
     frames: usize,
 }
 
 impl Analyzer {
     pub fn new() -> Self {
         let mut planner = FftPlanner::<f32>::new();
+        let window: Vec<f32> = (0..N)
+            .map(|i| {
+                let x = std::f32::consts::TAU * i as f32 / (N - 1) as f32;
+                0.5 * (1.0 - x.cos())
+            })
+            .collect();
         Self {
             fft: planner.plan_fft_forward(N),
             acc: vec![0.0; N],
             scratch: vec![Complex::new(0.0, 0.0); N],
+            window,
             frames: 0,
         }
     }
@@ -81,7 +97,9 @@ impl Analyzer {
         if buf.len() < N {
             return;
         }
-        self.scratch.copy_from_slice(&buf[..N]);
+        for ((s, &b), &w) in self.scratch.iter_mut().zip(&buf[..N]).zip(&self.window) {
+            *s = b * w;
+        }
         self.fft.process(&mut self.scratch);
         for (a, c) in self.acc.iter_mut().zip(self.scratch.iter()) {
             *a += c.norm_sqr();
@@ -147,8 +165,16 @@ pub fn extract(db: &[f32], center_hz: f64, fs: f64, gain_db: f64, sdr: &SdrInfo)
     peaks.truncate(12);
     let drone_suspected = peaks.iter().any(|p| p.wideband);
 
+    // Max-decimate the trace: taking every step-th bin would make a narrow burst
+    // (LoRa!) detectable by `peaks` yet invisible on screen.
     let step = (n / OUT_BINS).max(1);
-    let bins: Vec<f32> = (0..OUT_BINS).map(|k| db[(k * step).min(n - 1)]).collect();
+    let bins: Vec<f32> = (0..OUT_BINS)
+        .map(|k| {
+            let a = (k * step).min(n - 1);
+            let b = ((k + 1) * step).min(n);
+            db[a..b.max(a + 1)].iter().cloned().fold(f32::MIN, f32::max)
+        })
+        .collect();
 
     Frame {
         center_mhz: (center_hz / 1e6) as f32,
@@ -163,31 +189,94 @@ pub fn extract(db: &[f32], center_hz: f64, fs: f64, gain_db: f64, sdr: &SdrInfo)
         bins,
         sim: !sdr.present,
         sdr: sdr.clone(),
+        audio_rate: audio_rate_for(fs) as f32,
+        aircraft: Vec::new(),
         ts: now_ts(),
     }
 }
 
-/// FM-demodulate IQ whose carrier sits at DC (we tune the radio onto the station),
-/// then boxcar-low-pass + decimate down to `AUDIO_RATE`. Returns mono PCM ~[-1, 1].
-/// `last` carries the previous sample across calls for a continuous phase.
-pub fn fm_demod(iq: &[Complex<f32>], fs: f64, last: &mut Complex<f32>) -> Vec<f32> {
-    let decim = (fs / AUDIO_RATE).max(1.0) as usize;
-    let gain = 1.0 / std::f32::consts::PI; // normalise phase step to ~[-1, 1]
-    let mut out = Vec::with_capacity(iq.len() / decim + 1);
-    let mut acc = 0f32;
-    let mut cnt = 0usize;
-    for &s in iq {
-        let p = s * last.conj(); // instantaneous freq = arg(s · conj(prev))
-        *last = s;
-        acc += p.im.atan2(p.re) * gain;
-        cnt += 1;
-        if cnt >= decim {
-            out.push((acc / cnt as f32).clamp(-1.0, 1.0)); // boxcar LPF + decimate
-            acc = 0.0;
-            cnt = 0;
+/// Decimation factors and resulting audio rate for a given SDR sample rate.
+/// Stage 1 brings the IQ near 240 kHz (wide enough for the ±75 kHz FM signal),
+/// stage 2 brings the demodulated audio near 48 kHz. Integer factors only, so
+/// the *actual* rate differs slightly from 48 kHz — it is reported in `Frame`
+/// and the browser builds its audio buffers at that exact rate (no drift).
+fn fm_plan(fs: f64) -> (usize, usize) {
+    let d1 = (fs / FM_IF_RATE).round().max(1.0) as usize;
+    let if_rate = fs / d1 as f64;
+    let d2 = (if_rate / FM_AUDIO_TARGET).round().max(1.0) as usize;
+    (d1, d2)
+}
+
+pub fn audio_rate_for(fs: f64) -> f64 {
+    let (d1, d2) = fm_plan(fs);
+    fs / (d1 * d2) as f64
+}
+
+/// Broadcast-FM demodulator with state carried across IQ blocks.
+///
+/// Pipeline: boxcar-decimate the IQ to ~240 kHz → phase-discriminate
+/// (arg of s·conj(prev), normalised so ±75 kHz deviation ≈ ±1) → 50 µs
+/// de-emphasis (single-pole IIR) → boxcar-decimate to ~48 kHz mono PCM.
+pub struct FmDemod {
+    d1: usize,
+    d2: usize,
+    iq_acc: Complex<f32>,
+    iq_cnt: usize,
+    last: Complex<f32>,
+    deemph_a: f32,
+    deemph_y: f32,
+    au_acc: f32,
+    au_cnt: usize,
+}
+
+impl FmDemod {
+    pub fn new(fs: f64) -> Self {
+        let (d1, d2) = fm_plan(fs);
+        let if_rate = fs / d1 as f64;
+        let dt = 1.0 / if_rate as f32;
+        Self {
+            d1,
+            d2,
+            iq_acc: Complex::new(0.0, 0.0),
+            iq_cnt: 0,
+            last: Complex::new(0.0, 0.0),
+            deemph_a: 1.0 - (-dt / DEEMPHASIS_S).exp(),
+            deemph_y: 0.0,
+            au_acc: 0.0,
+            au_cnt: 0,
         }
     }
-    out
+
+    pub fn process(&mut self, iq: &[Complex<f32>], fs: f64) -> Vec<f32> {
+        let if_rate = fs / self.d1 as f64;
+        // phase step → audio: Δφ = 2π·f/if_rate, full scale at f = ±FM_DEVIATION_HZ
+        let gain = if_rate as f32 / (std::f32::consts::TAU * FM_DEVIATION_HZ);
+        let mut out = Vec::with_capacity(iq.len() / (self.d1 * self.d2) + 1);
+        for &s in iq {
+            self.iq_acc += s;
+            self.iq_cnt += 1;
+            if self.iq_cnt < self.d1 {
+                continue;
+            }
+            let z = self.iq_acc / self.d1 as f32; // stage-1 boxcar LPF + decimate
+            self.iq_acc = Complex::new(0.0, 0.0);
+            self.iq_cnt = 0;
+
+            let p = z * self.last.conj(); // instantaneous frequency
+            self.last = z;
+            let demod = p.im.atan2(p.re) * gain;
+            self.deemph_y += self.deemph_a * (demod - self.deemph_y); // de-emphasis
+
+            self.au_acc += self.deemph_y;
+            self.au_cnt += 1;
+            if self.au_cnt >= self.d2 {
+                out.push((self.au_acc / self.d2 as f32).clamp(-1.0, 1.0));
+                self.au_acc = 0.0;
+                self.au_cnt = 0;
+            }
+        }
+        out
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +334,12 @@ pub fn synth(center_hz: f64, fs: f64, rng: &mut Rng) -> Vec<f32> {
                 add_signal(&mut db, lo, bin_hz, st * 1e6, 180e3, -55.0 + rng.unit() * 6.0);
             }
         }
+    } else if (1080.0..1100.0).contains(&mhz) {
+        // sporadic Mode S replies at 1090 (the aircraft themselves are synthesized
+        // separately — see main.rs — this is just the visual signature)
+        if rng.unit() < 0.6 {
+            add_signal(&mut db, lo, bin_hz, 1090e6, 2e6, -60.0 - rng.unit() * 8.0);
+        }
     } else if (430.0..435.0).contains(&mhz) || (867.0..869.0).contains(&mhz) {
         // sporadic narrowband ISM / LoRa bursts
         if rng.unit() < 0.5 {
@@ -260,4 +355,80 @@ pub fn synth(center_hz: f64, fs: f64, rng: &mut Rng) -> Vec<f32> {
         }
     }
     db
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn flat(noise: f32) -> Vec<f32> {
+        vec![noise; N]
+    }
+
+    #[test]
+    fn extract_finds_a_narrowband_peak() {
+        let mut db = flat(-95.0);
+        // a 20-bin carrier at +1 MHz from center, fs = 8 MHz → bin ≈ 1.95 kHz
+        let c = N / 2 + (1e6 / (8e6 / N as f64)) as usize;
+        for k in c - 10..=c + 10 {
+            db[k] = -60.0;
+        }
+        let f = extract(&db, 100e6, 8e6, 32.0, &SdrInfo::default());
+        assert_eq!(f.peaks.len(), 1);
+        let p = &f.peaks[0];
+        assert!((p.center_mhz - 101.0).abs() < 0.05, "center {}", p.center_mhz);
+        assert!(p.snr_db > 30.0);
+        assert!(!p.wideband);
+        assert!(!f.drone_suspected);
+    }
+
+    #[test]
+    fn extract_flags_wideband_as_drone() {
+        let mut db = flat(-95.0);
+        // 6 MHz-wide block at center, fs = 20 MHz
+        let bins_6mhz = (6e6 / (20e6 / N as f64)) as usize;
+        let s = N / 2 - bins_6mhz / 2;
+        for k in s..s + bins_6mhz {
+            db[k] = -65.0;
+        }
+        let f = extract(&db, 2440e6, 20e6, 40.0, &SdrInfo::default());
+        assert!(f.drone_suspected);
+        assert!(f.peaks.iter().any(|p| p.wideband && p.bandwidth_mhz >= 5.0));
+    }
+
+    #[test]
+    fn trace_max_decimation_keeps_narrow_bursts_visible() {
+        let mut db = flat(-95.0);
+        db[1234] = -50.0; // single-bin spike (a LoRa-ish burst)
+        let f = extract(&db, 868e6, 4e6, 40.0, &SdrInfo::default());
+        let max = f.bins.iter().cloned().fold(f32::MIN, f32::max);
+        assert!(max > -55.0, "spike lost by decimation: max {max}");
+    }
+
+    #[test]
+    fn fm_demod_recovers_a_constant_offset() {
+        // a carrier 30 kHz off-center must demodulate to ≈ 30/75 = 0.4
+        let fs = 2.4e6;
+        let mut demod = FmDemod::new(fs);
+        let step = std::f32::consts::TAU * 30e3 / fs as f32;
+        let iq: Vec<Complex<f32>> = (0..240_000)
+            .map(|i| Complex::from_polar(1.0, step * i as f32))
+            .collect();
+        let pcm = demod.process(&iq, fs);
+        let expected_rate = audio_rate_for(fs);
+        let expected_len = (iq.len() as f64 / fs * expected_rate) as usize;
+        assert!((pcm.len() as i64 - expected_len as i64).abs() <= 2);
+        // after the de-emphasis filter settles, the tail must sit at 0.4
+        let tail = &pcm[pcm.len() / 2..];
+        let mean: f32 = tail.iter().sum::<f32>() / tail.len() as f32;
+        assert!((mean - 0.4).abs() < 0.02, "mean {mean}");
+    }
+
+    #[test]
+    fn audio_rate_close_to_48k_for_all_supported_rates() {
+        for fs in [2e6, 2.4e6, 4e6, 8e6, 20e6] {
+            let r = audio_rate_for(fs);
+            assert!((40e3..60e3).contains(&r), "fs {fs} → audio {r}");
+        }
+    }
 }

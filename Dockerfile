@@ -23,10 +23,12 @@ RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && r
 COPY server/src ./src
 RUN touch src/main.rs && cargo build --release
 
-# 3. Runtime: slim image with the HackRF SoapySDR module
+# 3. Runtime: slim image with the HackRF + RTL-SDR SoapySDR modules
+# (an RTL-SDR costs ~30 € vs ~300 € for a HackRF — same app, wider audience)
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        hackrf soapysdr-module-hackrf libsoapysdr0.8 ca-certificates \
+        hackrf soapysdr-module-hackrf soapysdr-module-rtlsdr librtlsdr0 \
+        libsoapysdr0.8 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/target/release/rf-academy /usr/local/bin/rf-academy

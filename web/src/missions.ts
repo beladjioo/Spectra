@@ -5,7 +5,8 @@ export type Objective =
   | { kind: "peak"; min_snr: number } // find a narrowband carrier
   | { kind: "burst" } // catch any transmission
   | { kind: "occupancy"; min: number } // a busy band
-  | { kind: "drone" }; // a wideband video link
+  | { kind: "drone" } // a wideband video link
+  | { kind: "aircraft" }; // a decoded ADS-B aircraft
 
 export type Mission = {
   id: string;
@@ -13,6 +14,8 @@ export type Mission = {
   title: string;
   tagline: string;
   xp: number;
+  /** Premium mission — requires a Pro licence. */
+  pro?: boolean;
   band: { label: string; center_mhz: number; sample_rate_msps: number; gain_db: number };
   objective: Objective;
   goalText: string;
@@ -82,11 +85,28 @@ export const MISSIONS: Mission[] = [
     ],
   },
   {
+    id: "adsb",
+    icon: "✈️",
+    title: "Radar ADS-B",
+    tagline: "Décoder les avions : indicatif, altitude, position",
+    xp: 250,
+    pro: true,
+    band: { label: "1090 MHz · Mode S", center_mhz: 1090, sample_rate_msps: 8, gain_db: 40 },
+    objective: { kind: "aircraft" },
+    goalText: "Décode au moins un avion réel (indicatif, altitude ou position).",
+    bible: [
+      "Tous les avions de ligne diffusent en clair leur position sur **1090 MHz** : c'est l'**ADS-B** (Mode S étendu). Chaque trame dure 120 µs : un préambule, puis 112 bits en **modulation de position d'impulsion** (PPM).",
+      "Ici on ne se contente plus de *détecter* de l'énergie : le moteur Rust **démodule et décode** chaque trame (CRC-24, indicatif du vol, altitude, position CPR, vitesse). C'est la différence entre voir un signal et le *comprendre*.",
+      "La position utilise l'encodage **CPR** : il faut deux trames (paire/impaire) pour résoudre la position sans ambiguïté — regarde les avions apparaître dans la table dès qu'une paire arrive.",
+    ],
+  },
+  {
     id: "drone",
     icon: "🚁",
     title: "CAPSTONE — Détecter un drone",
     tagline: "Repérer un lien vidéo OFDM large bande",
     xp: 300,
+    pro: true,
     band: { label: "2.44 GHz", center_mhz: 2440, sample_rate_msps: 20, gain_db: 40 },
     objective: { kind: "drone" },
     goalText: "Détecte une émission large bande (≥ 5 MHz) : la signature d'un drone.",
@@ -113,6 +133,8 @@ export function objectiveMet(m: Mission, f: Frame | null): boolean {
       return f.occupancy >= obj.min;
     case "drone":
       return f.drone_suspected;
+    case "aircraft":
+      return (f.aircraft?.length ?? 0) > 0;
   }
 }
 

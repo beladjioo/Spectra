@@ -3,8 +3,11 @@ import Spectrum from "./components/Spectrum";
 import Waterfall from "./components/Waterfall";
 import Library from "./components/Library";
 import Console from "./components/Console";
+import Quiz from "./components/Quiz";
+import AircraftTable from "./components/Aircraft";
 import { useRf, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE } from "./lib/library";
+import { activate, isPro } from "./lib/license";
 import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
 
 const KEY = "rf-academy-progress";
@@ -20,10 +23,12 @@ const loadProgress = (): Progress => {
 export default function App() {
   const { connected, frame } = useRf();
   const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [view, setView] = useState<"academy" | "mission" | "library" | "console">("academy");
+  const [view, setView] = useState<"academy" | "mission" | "library" | "console" | "exam">("academy");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [note, setNote] = useState<string>(FIRST_NOTE);
   const [toast, setToast] = useState<string | null>(null);
+  const [pro, setPro] = useState(isPro);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(progress));
@@ -34,6 +39,10 @@ export default function App() {
   const unlocked = (i: number) => i === 0 || isDone(MISSIONS[i - 1].id);
 
   const open = (m: Mission) => {
+    if (m.pro && !pro) {
+      setShowUpgrade(true);
+      return;
+    }
     setActiveId(m.id);
     setView("mission");
     tune(m.band.center_mhz, m.band.sample_rate_msps, m.band.gain_db);
@@ -61,14 +70,17 @@ export default function App() {
       <SdrBanner connected={connected} frame={frame} />
 
       <Tabs
-        active={view === "library" ? "library" : view === "console" ? "console" : "missions"}
+        active={view === "library" ? "library" : view === "console" ? "console" : view === "exam" ? "exam" : "missions"}
         onMissions={() => setView("academy")}
         onConsole={() => setView("console")}
         onLibrary={() => setView("library")}
+        onExam={() => setView("exam")}
       />
 
       {view === "console" ? (
         <Console frame={frame} onLearn={openNote} />
+      ) : view === "exam" ? (
+        <Quiz pro={pro} onUpgrade={() => setShowUpgrade(true)} onLearn={openNote} />
       ) : view === "library" ? (
         <Library slug={note} onSelect={openNote} onMission={openMissionById} />
       ) : view === "mission" && active ? (
@@ -87,18 +99,89 @@ export default function App() {
           }}
         />
       ) : (
-        <Academy done={progress.completed} unlocked={unlocked} onOpen={open} />
+        <Academy done={progress.completed} unlocked={unlocked} pro={pro} onOpen={open} />
       )}
 
-      <footer className="pb-2 text-center text-xs text-slate-600">
-        RF Academy · HackRF · réception seule · {frame?.sim ? "mode simulateur (aucun SDR détecté)" : "SDR en direct"}
+      <footer className="flex items-center justify-center gap-2 pb-2 text-center text-xs text-slate-600">
+        <span>
+          RF Academy · HackRF / RTL-SDR · réception seule ·{" "}
+          {frame?.sim ? "mode simulateur (aucun SDR détecté)" : "SDR en direct"}
+        </span>
+        {pro ? (
+          <span className="rounded-full border border-amber/40 px-2 py-0.5 font-semibold text-amber">PRO</span>
+        ) : (
+          <button onClick={() => setShowUpgrade(true)} className="text-phos underline-offset-2 hover:underline">
+            passer Pro
+          </button>
+        )}
       </footer>
+
+      {showUpgrade && (
+        <UpgradeModal
+          onClose={() => setShowUpgrade(false)}
+          onActivated={() => {
+            setPro(true);
+            setShowUpgrade(false);
+            setToast("Licence Pro activée — bienvenue à bord ✓");
+            setTimeout(() => setToast(null), 3200);
+          }}
+        />
+      )}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-pulse rounded-full border border-phos bg-phos/15 px-5 py-2.5 font-display text-sm font-bold text-phos shadow-lg">
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function UpgradeModal({ onClose, onActivated }: { onClose: () => void; onActivated: () => void }) {
+  const [key, setKey] = useState("");
+  const [err, setErr] = useState(false);
+  const tryActivate = () => {
+    if (activate(key)) onActivated();
+    else setErr(true);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-amber/40 bg-panel p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-display text-xl font-bold">
+          RF Academy <span className="text-amber">Pro</span>
+        </h2>
+        <ul className="mt-3 flex flex-col gap-2 text-sm text-slate-300">
+          <li>✈️ <b>Radar ADS-B</b> — décode les avions en vrai (indicatif, altitude, position)</li>
+          <li>🚁 <b>Capstone drone</b> — la détection de lien vidéo large bande</li>
+          <li>⏱️ <b>Examens blancs</b> chronométrés, notés par domaine comme à l'ANFR</li>
+          <li>❤️ et tu finances un outil indépendant, open-source et 100 % hors-ligne</li>
+        </ul>
+        <div className="mt-4">
+          <input
+            value={key}
+            onChange={(e) => {
+              setKey(e.target.value);
+              setErr(false);
+            }}
+            placeholder="RFA-XXXXXX-XXXX"
+            className={`w-full rounded-lg border bg-ink px-3 py-2 font-mono text-sm outline-none ${
+              err ? "border-rose-500" : "border-edge focus:border-amber"
+            }`}
+          />
+          {err && <p className="mt-1 text-xs text-rose-400">Clé invalide — vérifie le format RFA-XXXXXX-XXXX.</p>}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
+            plus tard
+          </button>
+          <button onClick={tryActivate} className="rounded-lg bg-amber px-5 py-2 text-sm font-semibold text-ink">
+            Activer ma clé
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -146,10 +229,12 @@ function Header({ connected, frame, xp }: { connected: boolean; frame: Frame | n
 function Academy({
   done,
   unlocked,
+  pro,
   onOpen,
 }: {
   done: string[];
   unlocked: (i: number) => boolean;
+  pro: boolean;
   onOpen: (m: Mission) => void;
 }) {
   return (
@@ -157,14 +242,15 @@ function Academy({
       <div className="rounded-2xl border border-edge bg-panel p-5">
         <h2 className="font-display text-lg font-bold">Bienvenue, opérateur·rice 📡</h2>
         <p className="mt-1 text-sm text-muted">
-          Branche ton HackRF (ou reste en simulateur), puis enchaîne les missions : chacune t'apprend une
-          bande, un concept, et te fait le repérer en direct. {done.length}/{MISSIONS.length} validées.
+          Branche ton HackRF ou ton RTL-SDR (ou reste en simulateur), puis enchaîne les missions : chacune
+          t'apprend une bande, un concept, et te fait le repérer en direct. {done.length}/{MISSIONS.length} validées.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {MISSIONS.map((m, i) => {
           const ok = done.includes(m.id);
           const open = unlocked(i);
+          const needsPro = !!m.pro && !pro;
           return (
             <button
               key={m.id}
@@ -174,7 +260,9 @@ function Academy({
                 ok
                   ? "border-phos/40 bg-phos/5"
                   : open
-                    ? "border-edge bg-panel hover:border-phos/60"
+                    ? needsPro
+                      ? "border-amber/30 bg-panel hover:border-amber/60"
+                      : "border-edge bg-panel hover:border-phos/60"
                     : "cursor-not-allowed border-edge bg-panel/40 opacity-50"
               }`}
             >
@@ -182,8 +270,15 @@ function Academy({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-display font-bold">{m.title}</h3>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ok ? "bg-phos text-ink" : "border border-edge text-muted"}`}>
-                    {ok ? "✓ fait" : `${m.xp} XP`}
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    {needsPro && (
+                      <span className="rounded-full border border-amber/50 bg-amber/10 px-2 py-0.5 text-[11px] font-bold text-amber">
+                        PRO
+                      </span>
+                    )}
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ok ? "bg-phos text-ink" : "border border-edge text-muted"}`}>
+                      {ok ? "✓ fait" : `${m.xp} XP`}
+                    </span>
                   </span>
                 </div>
                 <p className="mt-0.5 text-sm text-muted">{m.tagline}</p>
@@ -203,6 +298,7 @@ const LEARN: Record<string, string> = {
   fm: "modulations",
   ism868: "bandes-a-explorer",
   wifi24: "modulations",
+  adsb: "decoder-vs-detecter",
   drone: "decoder-vs-detecter",
 };
 
@@ -249,11 +345,13 @@ function Tabs({
   onMissions,
   onConsole,
   onLibrary,
+  onExam,
 }: {
-  active: "missions" | "console" | "library";
+  active: "missions" | "console" | "library" | "exam";
   onMissions: () => void;
   onConsole: () => void;
   onLibrary: () => void;
+  onExam: () => void;
 }) {
   const cls = (on: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
@@ -263,6 +361,7 @@ function Tabs({
     <div className="flex flex-wrap gap-2">
       <button className={cls(active === "missions")} onClick={onMissions}>🎯 Missions</button>
       <button className={cls(active === "console")} onClick={onConsole}>🎛️ Console</button>
+      <button className={cls(active === "exam")} onClick={onExam}>🎓 Examen</button>
       <button className={cls(active === "library")} onClick={onLibrary}>📖 Bibliothèque</button>
     </div>
   );
@@ -373,6 +472,14 @@ function MissionView({
             </div>
             <Spectrum frame={frame} />
           </div>
+          {m.objective.kind === "aircraft" && (
+            <div className="rounded-2xl border border-edge bg-panel p-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+                ✈️ Avions décodés (ADS-B)
+              </h3>
+              <AircraftTable list={frame?.aircraft ?? []} />
+            </div>
+          )}
           <div className="rounded-2xl border border-edge bg-panel p-4">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Cascade (waterfall) · le temps défile vers le bas</h3>
             <Waterfall frame={frame} />

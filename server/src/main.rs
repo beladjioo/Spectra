@@ -7,6 +7,7 @@
 //!
 //! Receive-only — nothing is ever transmitted.
 
+mod adsb;
 mod dsp;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,7 +28,8 @@ use serde::Deserialize;
 use tokio::sync::{broadcast, mpsc};
 use tower_http::services::{ServeDir, ServeFile};
 
-use dsp::{extract, fm_demod, synth, Analyzer, Frame, Rng, SdrInfo, AUDIO_RATE, N};
+use adsb::{AdsbDecoder, ADSB_FREQ_HZ};
+use dsp::{audio_rate_for, extract, synth, Analyzer, FmDemod, Frame, Rng, SdrInfo, N};
 
 /// Current radio tuning, pushed from the web UI to the SDR thread.
 #[derive(Clone, Copy)]
@@ -35,6 +37,32 @@ struct Tune {
     center_hz: f64,
     fs: f64,
     gain: f64,
+}
+
+impl Tune {
+    /// Clamp a user-supplied tuning into something every SDR survives; the
+    /// per-driver limits (RTL-SDR's narrow rate/range) are applied on top in
+    /// the SDR thread, where the driver is known.
+    fn sanitized(self) -> Tune {
+        Tune {
+            center_hz: self.center_hz.clamp(0.5e6, 6000e6),
+            fs: self.fs.clamp(0.25e6, 20e6),
+            gain: self.gain.clamp(0.0, 62.0),
+        }
+    }
+
+    /// Driver-specific limits (an RTL-SDR can't do 8 MSps or 2.4 GHz).
+    fn for_driver(mut self, driver: &str) -> Tune {
+        if driver == "rtlsdr" {
+            self.fs = self.fs.min(2.4e6);
+            self.center_hz = self.center_hz.clamp(24e6, 1766e6);
+        }
+        self
+    }
+
+    fn is_adsb(&self) -> bool {
+        (self.center_hz - ADSB_FREQ_HZ).abs() < 2e6
+    }
 }
 
 #[derive(Deserialize)]
@@ -103,11 +131,15 @@ async fn main() {
 }
 
 async fn tune(State(s): State<AppState>, Json(r): Json<TuneReq>) -> impl IntoResponse {
+    if !r.center_mhz.is_finite() {
+        return Json(serde_json::json!({ "ok": false }));
+    }
     let cmd = Tune {
         center_hz: r.center_mhz * 1e6,
-        fs: r.sample_rate_msps.unwrap_or(8.0) * 1e6,
-        gain: r.gain_db.unwrap_or(32.0),
-    };
+        fs: r.sample_rate_msps.filter(|v| v.is_finite()).unwrap_or(8.0) * 1e6,
+        gain: r.gain_db.filter(|v| v.is_finite()).unwrap_or(32.0),
+    }
+    .sanitized();
     let _ = s.cmds.send(cmd);
     Json(serde_json::json!({ "ok": true }))
 }
@@ -229,11 +261,16 @@ fn sim_loop(
             *cur = c;
         }
         let db = synth(cur.center_hz, cur.fs, &mut rng);
-        let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, info)));
+        let mut frame = extract(&db, cur.center_hz, cur.fs, cur.gain, info);
+        if cur.is_adsb() {
+            frame.aircraft = adsb::sim_aircraft(start.elapsed().as_secs_f64());
+        }
+        let _ = frames.send(Arc::new(frame));
         if audio_on.load(Ordering::Relaxed) {
             // 440 Hz test tone so the audio path can be validated without a HackRF
-            let n = (AUDIO_RATE * 0.12) as usize;
-            let step = std::f32::consts::TAU * 440.0 / AUDIO_RATE as f32;
+            let rate = audio_rate_for(cur.fs) as f32;
+            let n = (rate * 0.12) as usize;
+            let step = std::f32::consts::TAU * 440.0 / rate;
             let mut pcm = Vec::with_capacity(n);
             for _ in 0..n {
                 pcm.push(ph.sin() * 0.2);
@@ -259,6 +296,7 @@ fn real_loop(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use soapysdr::Direction::Rx;
 
+    *cur = cur.for_driver(&info.driver);
     let dev = soapysdr::Device::new(args)?;
     dev.set_sample_rate(Rx, 0, cur.fs)?;
     dev.set_frequency(Rx, 0, cur.center_hz, ())?;
@@ -268,30 +306,37 @@ fn real_loop(
 
     let mut an = Analyzer::new();
     let mut buf = vec![Complex::new(0.0f32, 0.0); N];
-    let mut last = Complex::new(0.0f32, 0.0); // FM demod state across blocks
+    let mut fm = FmDemod::new(cur.fs);
+    let mut adsb_dec = AdsbDecoder::new();
     const AVG: usize = 16;
     let mut errors = 0u32;
 
     loop {
         // apply pending retune commands from the UI
         while let Ok(c) = cmds.try_recv() {
+            let c = c.for_driver(&info.driver);
             let fs_changed = c.fs != cur.fs;
             *cur = c;
             let _ = dev.set_frequency(Rx, 0, cur.center_hz, ());
             let _ = dev.set_gain(Rx, 0, cur.gain);
             if fs_changed {
                 let _ = dev.set_sample_rate(Rx, 0, cur.fs);
+                fm = FmDemod::new(cur.fs);
             }
         }
         let listen = audio_on.load(Ordering::Relaxed);
+        let adsb_on = cur.is_adsb();
         for _ in 0..AVG {
             match stream.read(&mut [&mut buf], 1_000_000) {
                 Ok(n) if n == N => {
                     an.accumulate(&buf);
                     errors = 0;
                     if listen {
-                        let pcm = fm_demod(&buf, cur.fs, &mut last);
+                        let pcm = fm.process(&buf, cur.fs);
                         let _ = audio.send(pcm_bytes(&pcm));
+                    }
+                    if adsb_on {
+                        adsb_dec.feed(&buf, cur.fs);
                     }
                 }
                 Ok(_) => {}
@@ -302,6 +347,10 @@ fn real_loop(
             return Err("repeated read failures (SDR unplugged?)".into());
         }
         let db = an.render_db();
-        let _ = frames.send(Arc::new(extract(&db, cur.center_hz, cur.fs, cur.gain, info)));
+        let mut frame = extract(&db, cur.center_hz, cur.fs, cur.gain, info);
+        if adsb_on {
+            frame.aircraft = adsb_dec.snapshot();
+        }
+        let _ = frames.send(Arc::new(frame));
     }
 }

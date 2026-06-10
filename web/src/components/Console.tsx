@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Spectrum from "./Spectrum";
 import Waterfall from "./Waterfall";
+import AircraftTable from "./Aircraft";
 import { tune, type Frame } from "../lib/useRf";
 
 type Preset = { label: string; mhz: number; sr: number; gain: number; note?: string };
@@ -27,6 +28,11 @@ export default function Console({
   const [gain, setGain] = useState(32);
   const [listening, setListening] = useState(false);
   const audioRef = useRef<{ ctx: AudioContext; ws: WebSocket; next: number } | null>(null);
+  // exact PCM rate of the backend stream (depends on the SDR sample rate)
+  const rateRef = useRef(48000);
+  useEffect(() => {
+    if (frame?.audio_rate) rateRef.current = Math.min(96000, Math.max(8000, frame.audio_rate));
+  }, [frame?.audio_rate]);
 
   // push tuning to the radio whenever a control changes
   useEffect(() => {
@@ -55,7 +61,7 @@ export default function Console({
     ws.onmessage = (e) => {
       const i16 = new Int16Array(e.data as ArrayBuffer);
       if (!i16.length) return;
-      const buf = ctx.createBuffer(1, i16.length, 48000);
+      const buf = ctx.createBuffer(1, i16.length, rateRef.current);
       const ch = buf.getChannelData(0);
       for (let i = 0; i < i16.length; i++) ch[i] = i16[i] / 32768;
       const src = ctx.createBufferSource();
@@ -130,6 +136,12 @@ export default function Console({
           </div>
           <Spectrum frame={frame} />
         </section>
+        {(frame?.aircraft?.length ?? 0) > 0 && (
+          <section className="rounded-2xl border border-edge bg-panel p-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">✈️ Avions décodés (ADS-B)</h3>
+            <AircraftTable list={frame!.aircraft} />
+          </section>
+        )}
         <section className="rounded-2xl border border-edge bg-panel p-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Waterfall</h3>
           <Waterfall frame={frame} />
