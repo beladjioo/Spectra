@@ -1,13 +1,15 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { NOTES, backlinks, preprocess, titleOf } from "../lib/library";
+import { note, backlinks, preprocess, titleOf } from "../lib/library";
+import { useI18n, STR } from "../lib/i18n";
 
 type Nav = { onNote: (slug: string) => void; onMission: (id: string) => void };
 
 /** Renders one knowledge-base note: styled markdown + internal links + backlinks. */
 export default function NoteView({ slug, onNote, onMission }: { slug: string } & Nav) {
-  const body = preprocess(NOTES[slug] ?? "# Note introuvable");
-  const bl = backlinks(slug);
+  const { t, locale } = useI18n();
+  const body = preprocess(note(slug, locale) ?? t(STR.library.notFound), locale);
+  const bl = backlinks(slug, locale);
 
   const A = ({ href, children }: any) => {
     if (typeof href === "string" && href.startsWith("#note:")) {
@@ -35,12 +37,12 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
   };
 
   return (
-    <article className="mx-auto max-w-[64ch]">
+    <article className="prose-radio mx-auto max-w-[64ch]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="mb-8 font-display text-[2rem] font-bold leading-tight tracking-tight text-slate-50">{children}</h1>
+            <h1 className="mb-8 font-display text-[2rem] font-bold leading-tight tracking-tight text-paper">{children}</h1>
           ),
           h2: ({ children }) => (
             <h2 className="mb-3 mt-12 font-display text-xl font-semibold tracking-tight text-slate-100">{children}</h2>
@@ -48,9 +50,9 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
           h3: ({ children }) => (
             <h3 className="mb-2 mt-8 font-display text-base font-semibold text-slate-200">{children}</h3>
           ),
-          p: ({ children }) => <p className="mb-5 text-[15px] leading-[1.8] text-slate-300/90">{children}</p>,
-          ul: ({ children }) => <ul className="mb-5 ml-1 list-none space-y-2 text-[15px] leading-[1.8] text-slate-300/90">{children}</ul>,
-          ol: ({ children }) => <ol className="mb-5 ml-5 list-decimal space-y-2 text-[15px] leading-[1.8] text-slate-300/90 marker:text-muted">{children}</ol>,
+          p: ({ children }) => <p className="mb-5 text-[16px] leading-[1.85] text-slate-300/90">{children}</p>,
+          ul: ({ children }) => <ul className="mb-5 ml-1 list-none space-y-2 text-[16px] leading-[1.85] text-slate-300/90">{children}</ul>,
+          ol: ({ children }) => <ol className="mb-5 ml-5 list-decimal space-y-2 text-[16px] leading-[1.85] text-slate-300/90 marker:text-muted">{children}</ol>,
           li: ({ children, ...p }) =>
             "ordered" in p && (p as any).ordered ? (
               <li className="pl-1">{children}</li>
@@ -87,15 +89,17 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
 
       {bl.length > 0 && (
         <div className="mt-14 border-t border-edge/60 pt-5">
-          <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted">Mentionné dans</div>
-          <div className="flex flex-wrap gap-2">
+          <div className="mb-3 font-sans text-[11px] font-semibold uppercase tracking-wider text-muted">
+            {t(STR.library.mentioned)}
+          </div>
+          <div className="flex flex-wrap gap-2 font-sans">
             {bl.map((s) => (
               <button
                 key={s}
                 onClick={() => onNote(s)}
                 className="rounded-full border border-edge/70 px-3 py-1 text-xs text-slate-400 transition-colors hover:border-phos hover:text-phos"
               >
-                {titleOf(s)}
+                {titleOf(s, locale)}
               </button>
             ))}
           </div>

@@ -4,10 +4,13 @@ import Waterfall from "./components/Waterfall";
 import Library from "./components/Library";
 import Console from "./components/Console";
 import Quiz from "./components/Quiz";
+import Journey from "./components/Journey";
 import AircraftTable from "./components/Aircraft";
 import { useRf, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE } from "./lib/library";
 import { activate, isPro } from "./lib/license";
+import { useI18n, STR, type Locale } from "./lib/i18n";
+import { markRead, readSlugs } from "./journey";
 import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
 
 const KEY = "rf-academy-progress";
@@ -20,25 +23,31 @@ const loadProgress = (): Progress => {
   }
 };
 
+type View = "home" | "mission" | "library" | "console" | "exam";
+
 export default function App() {
+  const { t } = useI18n();
   const { connected, frame } = useRf();
   const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [view, setView] = useState<"academy" | "mission" | "library" | "console" | "exam">("academy");
+  const [view, setView] = useState<View>("home");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [note, setNote] = useState<string>(FIRST_NOTE);
   const [toast, setToast] = useState<string | null>(null);
   const [pro, setPro] = useState(isPro);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [read, setRead] = useState<Set<string>>(readSlugs);
 
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(progress));
   }, [progress]);
 
-  const active = useMemo(() => MISSIONS.find((m) => m.id === activeId) ?? null, [activeId]);
-  const isDone = (id: string) => progress.completed.includes(id);
-  const unlocked = (i: number) => i === 0 || isDone(MISSIONS[i - 1].id);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [view, note, activeId]);
 
-  const open = (m: Mission) => {
+  const active = useMemo(() => MISSIONS.find((m) => m.id === activeId) ?? null, [activeId]);
+
+  const openMission = (m: Mission) => {
     if (m.pro && !pro) {
       setShowUpgrade(true);
       return;
@@ -50,35 +59,51 @@ export default function App() {
   const openNote = (slug: string) => {
     setNote(slug);
     setView("library");
+    markRead(slug);
+    setRead(readSlugs());
   };
   const openMissionById = (id: string) => {
     const m = MISSIONS.find((x) => x.id === id);
-    if (m) open(m);
+    if (m) openMission(m);
   };
 
   const complete = (m: Mission) => {
-    if (isDone(m.id)) return;
+    if (progress.completed.includes(m.id)) return;
     setProgress((p) => ({ completed: [...p.completed, m.id], xp: p.xp + m.xp }));
-    setToast(`+${m.xp} XP — ${m.title} ✓`);
+    setToast(`+${m.xp} ${t(STR.toast.xp)} — ${t(m.title)} ✓`);
     setTimeout(() => setToast(null), 3200);
   };
 
   return (
-    <div className="mx-auto flex min-h-full max-w-[1200px] flex-col gap-5 p-4 md:p-6">
-      <Header connected={connected} frame={frame} xp={progress.xp} />
-
-      <SdrBanner connected={connected} frame={frame} />
-
-      <Tabs
-        active={view === "library" ? "library" : view === "console" ? "console" : view === "exam" ? "exam" : "missions"}
-        onMissions={() => setView("academy")}
-        onConsole={() => setView("console")}
-        onLibrary={() => setView("library")}
-        onExam={() => setView("exam")}
+    <div className="mx-auto flex min-h-full max-w-[1200px] flex-col gap-6 px-4 pb-10 pt-4 md:px-6">
+      <Header
+        connected={connected}
+        frame={frame}
+        xp={progress.xp}
+        view={view}
+        setView={setView}
+        pro={pro}
+        onUpgrade={() => setShowUpgrade(true)}
       />
 
-      {view === "console" ? (
-        <Console frame={frame} onLearn={openNote} />
+      {view === "home" ? (
+        <Journey
+          frame={frame}
+          read={read}
+          completed={progress.completed}
+          pro={pro}
+          nav={{
+            onMission: openMissionById,
+            onNote: openNote,
+            onExam: () => setView("exam"),
+            onConsole: () => setView("console"),
+          }}
+        />
+      ) : view === "console" ? (
+        <>
+          <SdrBanner connected={connected} frame={frame} />
+          <Console frame={frame} onLearn={openNote} />
+        </>
       ) : view === "exam" ? (
         <Quiz pro={pro} onUpgrade={() => setShowUpgrade(true)} onLearn={openNote} />
       ) : view === "library" ? (
@@ -87,31 +112,29 @@ export default function App() {
         <MissionView
           m={active}
           frame={frame}
-          done={isDone(active.id)}
+          done={progress.completed.includes(active.id)}
           onComplete={() => complete(active)}
-          onBack={() => setView("academy")}
+          onBack={() => setView("home")}
           onLearn={openNote}
           onNext={() => {
             const i = MISSIONS.findIndex((x) => x.id === active.id);
             const nxt = MISSIONS[i + 1];
-            if (nxt) open(nxt);
-            else setView("academy");
+            if (nxt) openMission(nxt);
+            else setView("home");
           }}
         />
-      ) : (
-        <Academy done={progress.completed} unlocked={unlocked} pro={pro} onOpen={open} />
-      )}
+      ) : null}
 
-      <footer className="flex items-center justify-center gap-2 pb-2 text-center text-xs text-slate-600">
+      <footer className="mt-auto flex flex-wrap items-center justify-center gap-2 border-t border-edge/40 pt-5 text-center text-xs text-slate-600">
         <span>
-          RF Academy · HackRF / RTL-SDR · réception seule ·{" "}
-          {frame?.sim ? "mode simulateur (aucun SDR détecté)" : "SDR en direct"}
+          {t(STR.footer.line)} ·{" "}
+          {frame?.sim ? t(STR.status.sim) : connected ? t(STR.status.live) : t(STR.status.offline)}
         </span>
         {pro ? (
           <span className="rounded-full border border-amber/40 px-2 py-0.5 font-semibold text-amber">PRO</span>
         ) : (
           <button onClick={() => setShowUpgrade(true)} className="text-phos underline-offset-2 hover:underline">
-            passer Pro
+            {t(STR.pro.upgrade)}
           </button>
         )}
       </footer>
@@ -122,7 +145,7 @@ export default function App() {
           onActivated={() => {
             setPro(true);
             setShowUpgrade(false);
-            setToast("Licence Pro activée — bienvenue à bord ✓");
+            setToast(t(STR.pro.activated));
             setTimeout(() => setToast(null), 3200);
           }}
         />
@@ -137,88 +160,87 @@ export default function App() {
   );
 }
 
-function UpgradeModal({ onClose, onActivated }: { onClose: () => void; onActivated: () => void }) {
-  const [key, setKey] = useState("");
-  const [err, setErr] = useState(false);
-  const tryActivate = () => {
-    if (activate(key)) onActivated();
-    else setErr(true);
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-2xl border border-amber/40 bg-panel p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="font-display text-xl font-bold">
-          RF Academy <span className="text-amber">Pro</span>
-        </h2>
-        <ul className="mt-3 flex flex-col gap-2 text-sm text-slate-300">
-          <li>✈️ <b>Radar ADS-B</b> — décode les avions en vrai (indicatif, altitude, position)</li>
-          <li>🚁 <b>Capstone drone</b> — la détection de lien vidéo large bande</li>
-          <li>⏱️ <b>Examens blancs</b> chronométrés, notés par domaine comme à l'ANFR</li>
-          <li>❤️ et tu finances un outil indépendant, open-source et 100 % hors-ligne</li>
-        </ul>
-        <div className="mt-4">
-          <input
-            value={key}
-            onChange={(e) => {
-              setKey(e.target.value);
-              setErr(false);
-            }}
-            placeholder="RFA-XXXXXX-XXXX"
-            className={`w-full rounded-lg border bg-ink px-3 py-2 font-mono text-sm outline-none ${
-              err ? "border-rose-500" : "border-edge focus:border-amber"
-            }`}
-          />
-          {err && <p className="mt-1 text-xs text-rose-400">Clé invalide — vérifie le format RFA-XXXXXX-XXXX.</p>}
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
-            plus tard
-          </button>
-          <button onClick={tryActivate} className="rounded-lg bg-amber px-5 py-2 text-sm font-semibold text-ink">
-            Activer ma clé
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* ── header: identity · nav · language · status ─────────────────────────── */
 
-function Header({ connected, frame, xp }: { connected: boolean; frame: Frame | null; xp: number }) {
+function Header({
+  connected,
+  frame,
+  xp,
+  view,
+  setView,
+  pro,
+  onUpgrade,
+}: {
+  connected: boolean;
+  frame: Frame | null;
+  xp: number;
+  view: View;
+  setView: (v: View) => void;
+  pro: boolean;
+  onUpgrade: () => void;
+}) {
+  const { t } = useI18n();
   const lvl = levelFor(xp);
   const into = xpIntoLevel(xp);
+  const title = STR.level.titles[Math.min(lvl - 1, STR.level.titles.length - 1)];
+
   return (
-    <header className="flex flex-col gap-3">
+    <header className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-baseline gap-3">
+        <button onClick={() => setView("home")} className="flex items-baseline gap-3 text-left">
           <h1 className="font-display text-2xl font-extrabold tracking-tight">
             RF<span className="text-phos">Academy</span>
           </h1>
-          <span className="hidden text-sm text-muted sm:inline">la bible du HackRF, mission par mission</span>
-        </div>
+          <span className="hidden text-sm italic text-muted sm:inline">{t(STR.tagline)}</span>
+        </button>
+
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-2 rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted">
-            <span className={`h-2 w-2 rounded-full ${connected ? "animate-pulse bg-phos" : "bg-rose-500"}`} />
-            {connected ? (frame?.sim ? "sim" : "en direct") : "hors-ligne"}
+          <span className="hidden items-center gap-2 rounded-full border border-edge bg-panel px-3 py-1.5 font-mono text-[11px] text-muted md:flex">
+            <span className={`h-2 w-2 rounded-full ${connected ? "animate-pulse-dot bg-phos" : "bg-rose-500"}`} />
+            {connected ? (frame?.sim ? t(STR.status.sim) : t(STR.status.live)) : t(STR.status.offline)}
           </span>
-          <span className="rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted">
-            🛡️ <b className="text-slate-200">Passif</b>
+          <span className="hidden rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted lg:inline">
+            🛡️ {t(STR.status.passive)}
           </span>
+          {pro ? (
+            <span className="rounded-full border border-amber/50 bg-amber/10 px-3 py-1.5 text-xs font-bold text-amber">
+              PRO
+            </span>
+          ) : (
+            <button
+              onClick={onUpgrade}
+              className="rounded-full border border-amber/40 px-3 py-1.5 text-xs font-semibold text-amber transition-colors hover:bg-amber/10"
+            >
+              {t(STR.pro.upgrade)}
+            </button>
+          )}
+          <LangSwitch />
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-phos/40 bg-phos/10 font-display text-sm font-bold text-phos">
-          {lvl}
-        </span>
-        <div className="flex-1">
-          <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-wider text-muted">
-            <span>Niveau {lvl}</span>
-            <span className="font-mono">{xp} XP</span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-edge">
-            <div className="h-full rounded-full bg-gradient-to-r from-phos to-amber transition-all" style={{ width: `${(into / 250) * 100}%` }} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap gap-2">
+          <Tab on={view === "home"} onClick={() => setView("home")} label={`🧭 ${t(STR.nav.journey)}`} />
+          <Tab on={view === "console"} onClick={() => setView("console")} label={`🎛️ ${t(STR.nav.explore)}`} />
+          <Tab on={view === "exam"} onClick={() => setView("exam")} label={`🎓 ${t(STR.nav.exam)}`} />
+          <Tab on={view === "library"} onClick={() => setView("library")} label={`📖 ${t(STR.nav.library)}`} />
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-phos/40 bg-phos/10 font-display text-xs font-bold text-phos">
+            {lvl}
+          </span>
+          <div className="w-36">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted">
+              <span className="truncate">{t(title)}</span>
+              <span className="font-mono">{xp}</span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-edge">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-phos to-amber transition-all"
+                style={{ width: `${(into / 250) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -226,71 +248,86 @@ function Header({ connected, frame, xp }: { connected: boolean; frame: Frame | n
   );
 }
 
-function Academy({
-  done,
-  unlocked,
-  pro,
-  onOpen,
-}: {
-  done: string[];
-  unlocked: (i: number) => boolean;
-  pro: boolean;
-  onOpen: (m: Mission) => void;
-}) {
+function Tab({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-2xl border border-edge bg-panel p-5">
-        <h2 className="font-display text-lg font-bold">Bienvenue, opérateur·rice 📡</h2>
-        <p className="mt-1 text-sm text-muted">
-          Branche ton HackRF ou ton RTL-SDR (ou reste en simulateur), puis enchaîne les missions : chacune
-          t'apprend une bande, un concept, et te fait le repérer en direct. {done.length}/{MISSIONS.length} validées.
-        </p>
+    <button
+      onClick={onClick}
+      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+        on ? "bg-phos text-ink" : "border border-edge bg-panel text-slate-300 hover:border-phos"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function LangSwitch() {
+  const { locale, setLocale } = useI18n();
+  const opt = (l: Locale) => (
+    <button
+      onClick={() => setLocale(l)}
+      className={`rounded-md px-2 py-1 font-mono text-[11px] font-semibold uppercase transition-colors ${
+        locale === l ? "bg-phos text-ink" : "text-muted hover:text-slate-200"
+      }`}
+      aria-pressed={locale === l}
+    >
+      {l}
+    </button>
+  );
+  return (
+    <span className="flex items-center gap-0.5 rounded-lg border border-edge bg-panel p-0.5">
+      {opt("fr")}
+      {opt("en")}
+    </span>
+  );
+}
+
+/* ── SDR banner (console view) ───────────────────────────────────────────── */
+
+function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | null }) {
+  const { t } = useI18n();
+  if (!connected || !frame) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-edge bg-panel p-4">
+        <span className="text-2xl">🔌</span>
+        <div className="text-sm text-muted">{t(STR.status.connecting)}</div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {MISSIONS.map((m, i) => {
-          const ok = done.includes(m.id);
-          const open = unlocked(i);
-          const needsPro = !!m.pro && !pro;
-          return (
-            <button
-              key={m.id}
-              disabled={!open}
-              onClick={() => onOpen(m)}
-              className={`group flex items-start gap-4 rounded-2xl border p-4 text-left transition-colors ${
-                ok
-                  ? "border-phos/40 bg-phos/5"
-                  : open
-                    ? needsPro
-                      ? "border-amber/30 bg-panel hover:border-amber/60"
-                      : "border-edge bg-panel hover:border-phos/60"
-                    : "cursor-not-allowed border-edge bg-panel/40 opacity-50"
-              }`}
-            >
-              <div className="text-3xl">{open ? m.icon : "🔒"}</div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-display font-bold">{m.title}</h3>
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    {needsPro && (
-                      <span className="rounded-full border border-amber/50 bg-amber/10 px-2 py-0.5 text-[11px] font-bold text-amber">
-                        PRO
-                      </span>
-                    )}
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ok ? "bg-phos text-ink" : "border border-edge text-muted"}`}>
-                      {ok ? "✓ fait" : `${m.xp} XP`}
-                    </span>
-                  </span>
-                </div>
-                <p className="mt-0.5 text-sm text-muted">{m.tagline}</p>
-                <p className="mt-1 font-mono text-[11px] text-slate-500">{m.band.label}</p>
-              </div>
-            </button>
-          );
-        })}
+    );
+  }
+  const s = frame.sdr;
+  if (s.present) {
+    return (
+      <div className="flex items-center gap-4 rounded-2xl border border-phos/40 bg-phos/5 p-4">
+        <span className="text-2xl">📡</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-display font-bold text-phos">
+            {s.label || "SDR"} {t(STR.sdr.detected)}
+          </div>
+          <div className="truncate font-mono text-xs text-muted">
+            {s.serial ? `${t(STR.sdr.serial)} ${s.serial}` : t(STR.sdr.noSerial)} · {t(STR.sdr.driver)} {s.driver}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full border border-phos/40 px-3 py-1 text-xs font-semibold text-phos">
+          {t(STR.sdr.liveBadge)}
+        </span>
       </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-amber/40 bg-amber/5 p-4">
+      <span className="text-2xl">🔌</span>
+      <div className="min-w-0 flex-1">
+        <div className="font-display font-bold text-amber">{t(STR.sdr.none)}</div>
+        <div className="text-xs text-muted">{t(STR.sdr.plugIn)}</div>
+      </div>
+      <span className="shrink-0 rounded-full border border-amber/40 px-3 py-1 text-xs font-semibold text-amber">
+        {t(STR.sdr.simBadge)}
+      </span>
     </div>
   );
 }
+
+/* ── mission view ────────────────────────────────────────────────────────── */
 
 /** Which knowledge-base note pairs with each mission. */
 const LEARN: Record<string, string> = {
@@ -301,71 +338,6 @@ const LEARN: Record<string, string> = {
   adsb: "decoder-vs-detecter",
   drone: "decoder-vs-detecter",
 };
-
-function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | null }) {
-  if (!connected || !frame) {
-    return (
-      <div className="flex items-center gap-3 rounded-2xl border border-edge bg-panel p-4">
-        <span className="text-2xl">🔌</span>
-        <div className="text-sm text-muted">Connexion au moteur RF…</div>
-      </div>
-    );
-  }
-  const s = frame.sdr;
-  if (s.present) {
-    return (
-      <div className="flex items-center gap-4 rounded-2xl border border-phos/40 bg-phos/5 p-4">
-        <span className="text-2xl">📡</span>
-        <div className="min-w-0 flex-1">
-          <div className="font-display font-bold text-phos">{s.label || "SDR"} détecté</div>
-          <div className="truncate font-mono text-xs text-muted">
-            {s.serial ? `n° de série ${s.serial}` : "n° de série indisponible"} · pilote {s.driver}
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full border border-phos/40 px-3 py-1 text-xs font-semibold text-phos">EN DIRECT</span>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-amber/40 bg-amber/5 p-4">
-      <span className="text-2xl">🔌</span>
-      <div className="min-w-0 flex-1">
-        <div className="font-display font-bold text-amber">Aucun SDR détecté</div>
-        <div className="text-xs text-muted">
-          Branche ton HackRF en USB — détection automatique en quelques secondes. En attendant : simulateur.
-        </div>
-      </div>
-      <span className="shrink-0 rounded-full border border-amber/40 px-3 py-1 text-xs font-semibold text-amber">SIMULATEUR</span>
-    </div>
-  );
-}
-
-function Tabs({
-  active,
-  onMissions,
-  onConsole,
-  onLibrary,
-  onExam,
-}: {
-  active: "missions" | "console" | "library" | "exam";
-  onMissions: () => void;
-  onConsole: () => void;
-  onLibrary: () => void;
-  onExam: () => void;
-}) {
-  const cls = (on: boolean) =>
-    `rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-      on ? "bg-phos text-ink" : "border border-edge bg-panel text-slate-300 hover:border-phos"
-    }`;
-  return (
-    <div className="flex flex-wrap gap-2">
-      <button className={cls(active === "missions")} onClick={onMissions}>🎯 Missions</button>
-      <button className={cls(active === "console")} onClick={onConsole}>🎛️ Console</button>
-      <button className={cls(active === "exam")} onClick={onExam}>🎓 Examen</button>
-      <button className={cls(active === "library")} onClick={onLibrary}>📖 Bibliothèque</button>
-    </div>
-  );
-}
 
 function MissionView({
   m,
@@ -384,6 +356,7 @@ function MissionView({
   onNext: () => void;
   onLearn: (slug: string) => void;
 }) {
+  const { t } = useI18n();
   const met = objectiveMet(m, frame);
   const heldRef = useRef<number | null>(null);
   const [justWon, setJustWon] = useState(false);
@@ -392,10 +365,11 @@ function MissionView({
   useEffect(() => {
     if (done || justWon || m.objective.kind === "observe") return;
     if (met) {
-      if (heldRef.current == null) heldRef.current = window.setTimeout(() => {
-        setJustWon(true);
-        onComplete();
-      }, 1200);
+      if (heldRef.current == null)
+        heldRef.current = window.setTimeout(() => {
+          setJustWon(true);
+          onComplete();
+        }, 1200);
     } else if (heldRef.current != null) {
       clearTimeout(heldRef.current);
       heldRef.current = null;
@@ -413,61 +387,77 @@ function MissionView({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <button onClick={onBack} className="text-sm text-muted hover:text-phos">← toutes les missions</button>
+        <button onClick={onBack} className="text-sm text-muted hover:text-phos">
+          {t(STR.mission.all)}
+        </button>
         <button
           onClick={() => onLearn(LEARN[m.id] ?? "bienvenue")}
           className="rounded-lg border border-edge bg-panel px-3 py-1.5 text-sm text-slate-300 hover:border-phos"
         >
-          📖 Lire la théorie
+          📖 {t(STR.mission.theory)}
         </button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,1.1fr)]">
-        {/* left — the bible + objective */}
+        {/* left — the brief + objective */}
         <section className="flex flex-col gap-4">
           <div className="rounded-2xl border border-edge bg-panel p-5">
             <div className="flex items-center gap-3">
               <span className="text-3xl">{m.icon}</span>
               <div>
-                <h2 className="font-display text-xl font-bold">{m.title}</h2>
+                <h2 className="font-display text-xl font-bold">{t(m.title)}</h2>
                 <p className="font-mono text-xs text-muted">{m.band.label}</p>
               </div>
             </div>
-            <div className="mt-4 flex flex-col gap-3 text-sm leading-relaxed text-slate-300">
+            <div className="prose-radio mt-4 flex flex-col gap-3 text-[15px] leading-[1.75] text-slate-300">
               {m.bible.map((p, i) => (
-                <p key={i} dangerouslySetInnerHTML={{ __html: mdBold(p) }} />
+                <p key={i} dangerouslySetInnerHTML={{ __html: mdBold(t(p)) }} />
               ))}
             </div>
           </div>
 
-          <div className={`rounded-2xl border p-5 transition-colors ${won ? "border-phos/50 bg-phos/10" : met ? "border-amber/50 bg-amber/5" : "border-edge bg-panel"}`}>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">Objectif</div>
-            <p className="mt-1 text-sm">{m.goalText}</p>
+          <div
+            className={`rounded-2xl border p-5 transition-colors ${
+              won ? "border-phos/50 bg-phos/10" : met ? "border-amber/50 bg-amber/5" : "border-edge bg-panel"
+            }`}
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+              {t(STR.mission.objective)}
+            </div>
+            <p className="mt-1 text-sm">{t(m.goalText)}</p>
             <div className="mt-3 flex items-center gap-3">
               {won ? (
                 <>
-                  <span className="font-display font-bold text-phos">✓ Mission validée · +{m.xp} XP</span>
-                  <button onClick={onNext} className="ml-auto rounded-lg bg-phos px-4 py-2 text-sm font-semibold text-ink">Suivant →</button>
+                  <span className="font-display font-bold text-phos">
+                    ✓ {t(STR.mission.validated)} · +{m.xp} XP
+                  </span>
+                  <button onClick={onNext} className="ml-auto rounded-lg bg-phos px-4 py-2 text-sm font-semibold text-ink">
+                    {t(STR.mission.next)}
+                  </button>
                 </>
               ) : m.objective.kind === "observe" ? (
-                <button onClick={onComplete} disabled={!frame} className="rounded-lg bg-phos px-4 py-2 text-sm font-semibold text-ink disabled:opacity-40">
-                  J'ai repéré le bruit de fond ✓
+                <button
+                  onClick={onComplete}
+                  disabled={!frame}
+                  className="rounded-lg bg-phos px-4 py-2 text-sm font-semibold text-ink disabled:opacity-40"
+                >
+                  {t(STR.mission.observed)}
                 </button>
               ) : (
                 <span className={`flex items-center gap-2 text-sm font-semibold ${met ? "text-amber" : "text-muted"}`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${met ? "animate-pulse bg-amber" : "bg-muted"}`} />
-                  {met ? "signal détecté… maintiens-le" : "en recherche…"}
+                  {met ? t(STR.mission.holding) : t(STR.mission.searching)}
                 </span>
               )}
             </div>
           </div>
         </section>
 
-        {/* right — live RF */}
+        {/* right — live instruments */}
         <section className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-edge bg-panel p-4">
+          <div className="crt border border-edge/70 p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">Spectre en direct</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.mission.liveSpectrum)}</h3>
               <Stats frame={frame} />
             </div>
             <Spectrum frame={frame} />
@@ -475,13 +465,13 @@ function MissionView({
           {m.objective.kind === "aircraft" && (
             <div className="rounded-2xl border border-edge bg-panel p-4">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-                ✈️ Avions décodés (ADS-B)
+                ✈️ {t(STR.mission.aircraft)}
               </h3>
               <AircraftTable list={frame?.aircraft ?? []} />
             </div>
           )}
-          <div className="rounded-2xl border border-edge bg-panel p-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Cascade (waterfall) · le temps défile vers le bas</h3>
+          <div className="crt border border-edge/70 p-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.mission.waterfall)}</h3>
             <Waterfall frame={frame} />
           </div>
         </section>
@@ -491,17 +481,76 @@ function MissionView({
 }
 
 function Stats({ frame }: { frame: Frame | null }) {
+  const { t } = useI18n();
   if (!frame) return <span className="font-mono text-xs text-muted">—</span>;
   return (
     <span className="flex gap-3 font-mono text-xs text-muted">
-      <span>bruit <b className="text-slate-300">{frame.noise_floor_db.toFixed(0)}</b></span>
-      <span>pic <b className="text-slate-300">{frame.peak_db.toFixed(0)}</b> dB</span>
-      <span>occ <b className="text-slate-300">{(frame.occupancy * 100).toFixed(0)}</b>%</span>
+      <span>
+        {t(STR.mission.noise)} <b className="text-slate-300">{frame.noise_floor_db.toFixed(0)}</b>
+      </span>
+      <span>
+        {t(STR.mission.peak)} <b className="text-slate-300">{frame.peak_db.toFixed(0)}</b> dB
+      </span>
+      <span>
+        {t(STR.mission.occ)} <b className="text-slate-300">{(frame.occupancy * 100).toFixed(0)}</b>%
+      </span>
     </span>
   );
 }
 
-/** minimal **bold** rendering for the bible text */
+/* ── Pro modal ───────────────────────────────────────────────────────────── */
+
+function UpgradeModal({ onClose, onActivated }: { onClose: () => void; onActivated: () => void }) {
+  const { t } = useI18n();
+  const [key, setKey] = useState("");
+  const [err, setErr] = useState(false);
+  const tryActivate = () => {
+    if (activate(key)) onActivated();
+    else setErr(true);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-amber/40 bg-panel p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-display text-xl font-bold">
+          RF Academy <span className="text-amber">{t(STR.pro.title2)}</span>
+        </h2>
+        <ul className="mt-3 flex flex-col gap-2 text-sm text-slate-300">
+          <li>✈️ {t(STR.pro.f1)}</li>
+          <li>🚁 {t(STR.pro.f2)}</li>
+          <li>⏱️ {t(STR.pro.f3)}</li>
+          <li>❤️ {t(STR.pro.f4)}</li>
+        </ul>
+        <div className="mt-4">
+          <input
+            value={key}
+            onChange={(e) => {
+              setKey(e.target.value);
+              setErr(false);
+            }}
+            placeholder={t(STR.pro.placeholder)}
+            className={`w-full rounded-lg border bg-ink px-3 py-2 font-mono text-sm outline-none ${
+              err ? "border-rose-500" : "border-edge focus:border-amber"
+            }`}
+          />
+          {err && <p className="mt-1 text-xs text-rose-400">{t(STR.pro.invalid)}</p>}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
+            {t(STR.pro.later)}
+          </button>
+          <button onClick={tryActivate} className="rounded-lg bg-amber px-5 py-2 text-sm font-semibold text-ink">
+            {t(STR.pro.activate)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** minimal **bold** rendering for the mission brief */
 function mdBold(s: string): string {
   return s
     .replace(/&/g, "&amp;")

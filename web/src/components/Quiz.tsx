@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { byCategory, shuffled, CATEGORY_LABEL, QUESTIONS, type Category, type Question } from "../quiz";
+import { useI18n, STR, fmt } from "../lib/i18n";
+import { EXAM_DONE_KEY } from "../journey";
 
 // ── Répétition espacée (Leitner) ─────────────────────────────────────────────
 // box 0 = nouvelle/ratée … box 4 = acquise ; chaque succès espace la revue.
@@ -18,7 +20,7 @@ const loadSrs = (): SrsState => {
 
 // ── Examen blanc ─────────────────────────────────────────────────────────────
 const EXAM_MINUTES = 30;
-const PASS_RATIO = 0.5; // ≥ 10/20 dans chaque domaine, comme à l'ANFR
+const PASS_RATIO = 0.5; // ≥ la moitié dans chaque domaine, comme à l'ANFR
 
 type ExamState = {
   questions: Question[];
@@ -73,36 +75,35 @@ function Menu({
   onExam: () => void;
   onUpgrade: () => void;
 }) {
+  const { t } = useI18n();
   const stats = useMemo(srsStats, []);
   return (
     <>
-      <div className="rounded-2xl border border-edge bg-panel p-5">
-        <h2 className="font-display text-lg font-bold">🎓 Préparation à l'examen radioamateur</h2>
-        <p className="mt-1 text-sm text-muted">
-          {QUESTIONS.length} questions type ANFR sur deux domaines (réglementation, technique), avec
-          explications et liens vers la bibliothèque. La révision utilise la répétition espacée : les
-          questions ratées reviennent vite, les acquises s'espacent.
-        </p>
+      <div className="rise rounded-2xl border border-edge bg-panel p-5">
+        <h2 className="font-display text-lg font-bold">🎓 {t(STR.quiz.title)}</h2>
+        <p className="mt-1 text-sm text-muted">{fmt(t(STR.quiz.intro), { n: QUESTIONS.length })}</p>
         <p className="mt-2 font-mono text-xs text-muted">
-          <b className="text-phos">{stats.acquired}</b> acquises · <b className="text-amber">{stats.learning}</b> en
-          cours · <b className="text-slate-300">{stats.fresh}</b> nouvelles
+          <b className="text-phos">{stats.acquired}</b> {t(STR.quiz.acquired)} ·{" "}
+          <b className="text-amber">{stats.learning}</b> {t(STR.quiz.learning)} ·{" "}
+          <b className="text-slate-300">{stats.fresh}</b> {t(STR.quiz.fresh)}
         </p>
+        <p className="mt-1 text-[11px] text-slate-600">{t(STR.quiz.frNote)}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <button
           onClick={onTrain}
-          className="rounded-2xl border border-edge bg-panel p-5 text-left transition-colors hover:border-phos/60"
+          className="rise rounded-2xl border border-edge bg-panel p-5 text-left transition-colors hover:border-phos/60"
+          style={{ animationDelay: "80ms" }}
         >
           <div className="text-3xl">📚</div>
-          <h3 className="mt-2 font-display font-bold">Réviser</h3>
-          <p className="mt-1 text-sm text-muted">
-            Questions une par une, correction immédiate et explication. Gratuit, illimité.
-          </p>
+          <h3 className="mt-2 font-display font-bold">{t(STR.quiz.train)}</h3>
+          <p className="mt-1 text-sm text-muted">{t(STR.quiz.trainSub)}</p>
         </button>
         <button
           onClick={pro ? onExam : onUpgrade}
-          className="relative rounded-2xl border border-edge bg-panel p-5 text-left transition-colors hover:border-amber/60"
+          className="rise relative rounded-2xl border border-edge bg-panel p-5 text-left transition-colors hover:border-amber/60"
+          style={{ animationDelay: "140ms" }}
         >
           {!pro && (
             <span className="absolute right-4 top-4 rounded-full border border-amber/50 bg-amber/10 px-2 py-0.5 text-[11px] font-bold text-amber">
@@ -110,10 +111,9 @@ function Menu({
             </span>
           )}
           <div className="text-3xl">⏱️</div>
-          <h3 className="mt-2 font-display font-bold">Examen blanc</h3>
+          <h3 className="mt-2 font-display font-bold">{t(STR.quiz.exam)}</h3>
           <p className="mt-1 text-sm text-muted">
-            Conditions réelles : {QUESTIONS.length} questions chronométrées ({EXAM_MINUTES} min), score par
-            domaine, seuil de réussite comme à l'ANFR.
+            {fmt(t(STR.quiz.examSub), { n: QUESTIONS.length, m: EXAM_MINUTES })}
           </p>
         </button>
       </div>
@@ -124,6 +124,7 @@ function Menu({
 // ── Mode révision ────────────────────────────────────────────────────────────
 
 function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string) => void }) {
+  const { t } = useI18n();
   const [queue, setQueue] = useState<Question[]>(() => {
     const srs = loadSrs();
     const now = Date.now();
@@ -160,7 +161,7 @@ function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string
     <>
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-sm text-muted hover:text-phos">
-          ← examen
+          {t(STR.quiz.back)}
         </button>
         <span className="font-mono text-xs text-muted">
           <b className="text-phos">{score.ok}</b> ✓ · <b className="text-rose-400">{score.ko}</b> ✗
@@ -169,7 +170,7 @@ function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string
       <QuestionCard q={q} picked={picked} onPick={answer} onLearn={onLearn} />
       {picked != null && (
         <button onClick={next} className="self-end rounded-lg bg-phos px-5 py-2 text-sm font-semibold text-ink">
-          Question suivante →
+          {t(STR.quiz.nextQ)}
         </button>
       )}
     </>
@@ -179,6 +180,7 @@ function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string
 // ── Examen blanc ─────────────────────────────────────────────────────────────
 
 function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string) => void }) {
+  const { t } = useI18n();
   const [exam, setExam] = useState<ExamState>(() => ({
     questions: [...shuffled(byCategory("reglementation")), ...shuffled(byCategory("technique"))],
     answers: {},
@@ -190,11 +192,11 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
   // horloge
   useEffect(() => {
     if (exam.finished) return;
-    const t = setInterval(() => {
+    const h = setInterval(() => {
       if (Date.now() >= exam.endsAt) setExam((e) => ({ ...e, finished: true }));
       else tick((x) => x + 1);
     }, 1000);
-    return () => clearInterval(t);
+    return () => clearInterval(h);
   }, [exam.finished, exam.endsAt]);
 
   const remaining = Math.max(0, exam.endsAt - Date.now());
@@ -210,6 +212,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
     const reg = score("reglementation");
     const tec = score("technique");
     const passed = reg.pass && tec.pass;
+    if (passed) localStorage.setItem(EXAM_DONE_KEY, "1"); // journey checkpoint
     const wrong = exam.questions.filter((q) => exam.answers[q.id] !== q.answer);
     return (
       <>
@@ -217,19 +220,21 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
           className={`rounded-2xl border p-6 text-center ${passed ? "border-phos/50 bg-phos/10" : "border-rose-500/50 bg-rose-500/5"}`}
         >
           <div className="text-4xl">{passed ? "🏆" : "📚"}</div>
-          <h2 className="mt-2 font-display text-xl font-bold">{passed ? "Examen blanc réussi !" : "Pas encore…"}</h2>
+          <h2 className="mt-2 font-display text-xl font-bold">{passed ? t(STR.quiz.passed) : t(STR.quiz.failed)}</h2>
           <p className="mt-2 font-mono text-sm text-slate-300">
-            {CATEGORY_LABEL.reglementation} : {reg.ok}/{reg.total} {reg.pass ? "✓" : "✗"} ·{" "}
-            {CATEGORY_LABEL.technique} : {tec.ok}/{tec.total} {tec.pass ? "✓" : "✗"}
+            {t(CATEGORY_LABEL.reglementation)} : {reg.ok}/{reg.total} {reg.pass ? "✓" : "✗"} ·{" "}
+            {t(CATEGORY_LABEL.technique)} : {tec.ok}/{tec.total} {tec.pass ? "✓" : "✗"}
           </p>
-          <p className="mt-1 text-xs text-muted">Seuil : la moitié des points dans chaque domaine.</p>
+          <p className="mt-1 text-xs text-muted">{t(STR.quiz.threshold)}</p>
           <button onClick={onBack} className="mt-4 rounded-lg bg-phos px-5 py-2 text-sm font-semibold text-ink">
-            Retour
+            {t(STR.quiz.backBtn)}
           </button>
         </div>
         {wrong.length > 0 && (
           <div className="flex flex-col gap-3">
-            <h3 className="font-display font-bold">À revoir ({wrong.length})</h3>
+            <h3 className="font-display font-bold">
+              {t(STR.quiz.review)} ({wrong.length})
+            </h3>
             {wrong.map((q) => (
               <QuestionCard key={q.id} q={q} picked={exam.answers[q.id] ?? null} onPick={() => {}} onLearn={onLearn} review />
             ))}
@@ -244,7 +249,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
     <>
       <div className="sticky top-2 z-10 flex items-center justify-between rounded-xl border border-edge bg-panel/95 px-4 py-2 backdrop-blur">
         <button onClick={onBack} className="text-sm text-muted hover:text-phos">
-          ← abandonner
+          {t(STR.quiz.abandon)}
         </button>
         <span className="font-mono text-sm">
           {answered}/{exam.questions.length} ·{" "}
@@ -256,16 +261,16 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
           onClick={() => setExam((e) => ({ ...e, finished: true }))}
           className="rounded-lg bg-phos px-4 py-1.5 text-sm font-semibold text-ink"
         >
-          Terminer
+          {t(STR.quiz.finish)}
         </button>
       </div>
       {exam.questions.map((q, i) => (
         <div key={q.id} className="rounded-2xl border border-edge bg-panel p-5">
           <p className="text-sm">
             <span className="font-mono text-xs text-muted">
-              {i + 1}. [{CATEGORY_LABEL[q.cat]}]
+              {i + 1}. [{t(CATEGORY_LABEL[q.cat])}]
             </span>{" "}
-            {q.q}
+            {t(q.q)}
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {q.choices.map((c, ci) => (
@@ -276,7 +281,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
                   exam.answers[q.id] === ci ? "border-phos bg-phos/10 text-phos" : "border-edge bg-ink hover:border-phos/50"
                 }`}
               >
-                {c}
+                {t(c)}
               </button>
             ))}
           </div>
@@ -286,7 +291,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
         onClick={() => setExam((e) => ({ ...e, finished: true }))}
         className="self-center rounded-lg bg-phos px-6 py-2.5 text-sm font-semibold text-ink"
       >
-        Terminer l'examen
+        {t(STR.quiz.finishExam)}
       </button>
     </>
   );
@@ -307,11 +312,14 @@ function QuestionCard({
   onLearn: (slug: string) => void;
   review?: boolean;
 }) {
+  const { t } = useI18n();
   const revealed = review || picked != null;
   return (
     <div className="rounded-2xl border border-edge bg-panel p-5">
-      <span className="rounded-full border border-edge px-2 py-0.5 text-[11px] text-muted">{CATEGORY_LABEL[q.cat]}</span>
-      <p className="mt-2 text-sm leading-relaxed">{q.q}</p>
+      <span className="rounded-full border border-edge px-2 py-0.5 text-[11px] text-muted">
+        {t(CATEGORY_LABEL[q.cat])}
+      </span>
+      <p className="mt-2 text-sm leading-relaxed">{t(q.q)}</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {q.choices.map((c, i) => {
           let cls = "border-edge bg-ink hover:border-phos/50";
@@ -327,17 +335,17 @@ function QuestionCard({
               onClick={() => onPick(i)}
               className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${cls}`}
             >
-              {c}
+              {t(c)}
             </button>
           );
         })}
       </div>
       {revealed && (
         <div className="mt-3 rounded-lg border border-edge bg-ink p-3 text-sm text-slate-300">
-          💡 {q.why}{" "}
+          💡 {t(q.why)}{" "}
           {q.note && (
             <button onClick={() => onLearn(q.note!)} className="text-phos underline-offset-2 hover:underline">
-              → réviser cette notion
+              {t(STR.quiz.revise)}
             </button>
           )}
         </div>

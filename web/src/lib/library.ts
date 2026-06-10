@@ -1,7 +1,15 @@
-// Loads the original SDR knowledge base (web/content/*.md) and provides the
-// Obsidian-style plumbing: titles, sections, wikilinks, backlinks, search.
+// Bilingual knowledge base (web/content/{fr,en}/*.md) with Obsidian-style
+// plumbing: titles, sections, wikilinks, backlinks, search. Slugs are shared
+// across locales; English falls back to French if a translation is missing.
 
-const raw = import.meta.glob("../../content/*.md", {
+import type { Locale, LStr } from "./i18n";
+
+const rawFr = import.meta.glob("../../content/fr/*.md", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+const rawEn = import.meta.glob("../../content/en/*.md", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -9,32 +17,48 @@ const raw = import.meta.glob("../../content/*.md", {
 
 const slugFromPath = (p: string) => p.split("/").pop()!.replace(/\.md$/, "");
 
-/** slug -> raw markdown body */
-export const NOTES: Record<string, string> = {};
-for (const p in raw) NOTES[slugFromPath(p)] = raw[p];
+const byLocale: Record<Locale, Record<string, string>> = { fr: {}, en: {} };
+for (const p in rawFr) byLocale.fr[slugFromPath(p)] = rawFr[p];
+for (const p in rawEn) byLocale.en[slugFromPath(p)] = rawEn[p];
+
+export const SLUGS = Object.keys(byLocale.fr);
+
+/** Raw markdown of a note in the given locale (FR fallback). */
+export function note(slug: string, locale: Locale): string | undefined {
+  return byLocale[locale][slug] ?? byLocale.fr[slug];
+}
 
 /** First "# Heading" of a note, used as its title. */
-export function titleOf(slug: string): string {
-  const m = (NOTES[slug] || "").match(/^#\s+(.+)$/m);
+export function titleOf(slug: string, locale: Locale): string {
+  const m = (note(slug, locale) || "").match(/^#\s+(.+)$/m);
   return m ? m[1].trim() : slug;
 }
 
-export type Section = { title: string; notes: string[] };
+export type Section = { title: LStr; notes: string[] };
 
-/** Sidebar order. Anything not listed is appended under "Divers". */
+/** Sidebar order. */
 export const SECTIONS: Section[] = [
-  { title: "Pour commencer", notes: ["bienvenue"] },
-  { title: "Fondamentaux RF", notes: ["ondes-radio", "decibels", "bruit-et-snr"] },
-  { title: "Le signal numérique", notes: ["echantillonnage", "iq"] },
-  { title: "Spectre & DSP", notes: ["fft-spectre", "waterfall"] },
-  { title: "Le matériel", notes: ["sdr-architecture", "hackrf", "antennes"] },
-  { title: "Modulations", notes: ["modulations"] },
+  { title: { fr: "Pour commencer", en: "Start here" }, notes: ["bienvenue"] },
   {
-    title: "En pratique",
+    title: { fr: "Fondamentaux RF", en: "RF fundamentals" },
+    notes: ["ondes-radio", "decibels", "bruit-et-snr"],
+  },
+  {
+    title: { fr: "Le signal numérique", en: "The digital signal" },
+    notes: ["echantillonnage", "iq"],
+  },
+  { title: { fr: "Spectre & DSP", en: "Spectrum & DSP" }, notes: ["fft-spectre", "waterfall"] },
+  {
+    title: { fr: "Le matériel", en: "The hardware" },
+    notes: ["sdr-architecture", "hackrf", "antennes"],
+  },
+  { title: { fr: "Modulations", en: "Modulation" }, notes: ["modulations"] },
+  {
+    title: { fr: "En pratique", en: "In practice" },
     notes: ["workflow-live", "bandes-a-explorer", "decoder-vs-detecter", "legal-securite"],
   },
   {
-    title: "Radioamateur — réglementation & trafic",
+    title: { fr: "Radioamateur — réglementation & trafic", en: "Ham radio — regulations & operating" },
     notes: [
       "examen-radioamateur",
       "reglementation",
@@ -44,7 +68,7 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    title: "Radioamateur — technique",
+    title: { fr: "Radioamateur — technique", en: "Ham radio — technical" },
     notes: [
       "electricite",
       "composants-electroniques",
@@ -60,25 +84,25 @@ export const SECTIONS: Section[] = [
 export const FIRST_NOTE = "bienvenue";
 
 /** Turn [[slug]] / [[slug|label]] into markdown links the renderer understands. */
-export function preprocess(md: string): string {
+export function preprocess(md: string, locale: Locale): string {
   return md.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, slug, label) => {
     const s = String(slug).trim();
-    return `[${label || titleOf(s)}](#note:${s})`;
+    return `[${label || titleOf(s, locale)}](#note:${s})`;
   });
 }
 
 /** Notes that link to `slug` (via [[slug]] or [[slug|...]]). */
-export function backlinks(slug: string): string[] {
+export function backlinks(slug: string, locale: Locale): string[] {
   const re = new RegExp(`\\[\\[${slug}(\\||\\])`);
-  return Object.keys(NOTES).filter((s) => s !== slug && re.test(NOTES[s]));
+  return SLUGS.filter((s) => s !== slug && re.test(note(s, locale) || ""));
 }
 
-/** Simple title+body substring search. */
-export function search(q: string): string[] {
+/** Simple title+body substring search in the active locale. */
+export function search(q: string, locale: Locale): string[] {
   const t = q.trim().toLowerCase();
   if (!t) return [];
-  return Object.keys(NOTES)
-    .filter((s) => titleOf(s).toLowerCase().includes(t) || NOTES[s].toLowerCase().includes(t))
-    .sort((a, b) => titleOf(a).localeCompare(titleOf(b)))
-    .slice(0, 25);
+  return SLUGS.filter((s) => {
+    const body = (note(s, locale) || "").toLowerCase();
+    return body.includes(t) || titleOf(s, locale).toLowerCase().includes(t);
+  }).slice(0, 20);
 }
