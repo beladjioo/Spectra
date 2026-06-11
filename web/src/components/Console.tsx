@@ -41,6 +41,8 @@ export default function Console({
     tune(mhz, sr, gain);
   }, [mhz, sr, gain]);
 
+  const oscRef = useRef<{ ctx: AudioContext; osc: OscillatorNode } | null>(null);
+
   const stopAudio = () => {
     fetch("/api/audio?on=false", { method: "POST" }).catch(() => {});
     const a = audioRef.current;
@@ -49,10 +51,30 @@ export default function Console({
       a.ctx.close().catch(() => {});
       audioRef.current = null;
     }
+    const o = oscRef.current;
+    if (o) {
+      o.osc.stop();
+      o.ctx.close().catch(() => {});
+      oscRef.current = null;
+    }
     setListening(false);
   };
 
   const startAudio = () => {
+    // browser-simulator mode (static deployment): local 440 Hz test tone,
+    // no backend audio stream to subscribe to
+    if (frame?.sdr.driver === "sim-web") {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const vol = ctx.createGain();
+      osc.frequency.value = 440;
+      vol.gain.value = 0.15;
+      osc.connect(vol).connect(ctx.destination);
+      osc.start();
+      oscRef.current = { ctx, osc };
+      setListening(true);
+      return;
+    }
     const ctx = new AudioContext();
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/audio`);

@@ -243,6 +243,15 @@ export const STR = {
       fr: "et tu finances un outil indépendant, open-source et 100 % hors-ligne",
       en: "and you fund an independent, open-source, fully offline tool",
     },
+    getKey: {
+      fr: "☕ Soutenir le projet & recevoir ma clé",
+      en: "☕ Support the project & get my key",
+    },
+    getKeyHint: {
+      fr: "Fais un don du montant de ton choix sur Buy Me a Coffee en laissant ton email — ta clé Supporter arrive en retour.",
+      en: "Donate any amount on Buy Me a Coffee and leave your email — your Supporter key comes right back.",
+    },
+    haveKey: { fr: "Déjà une clé ?", en: "Already have a key?" },
     placeholder: { fr: "RFA-XXXXXX-XXXX", en: "RFA-XXXXXX-XXXX" },
     invalid: {
       fr: "Clé invalide — vérifie le format RFA-XXXXXX-XXXX.",

@@ -41,7 +41,10 @@ export type Frame = {
   ts: number;
 };
 
-/** Subscribes to the backend WebSocket and exposes the latest spectrum frame. */
+/** Subscribes to the backend WebSocket and exposes the latest spectrum frame.
+ *  If no backend is reachable (the static Cloudflare Pages deployment), an
+ *  in-browser simulator takes over so the whole app still works — and it
+ *  keeps retrying the backend quietly in case one appears. */
 export function useRf() {
   const [connected, setConnected] = useState(false);
   const [frame, setFrame] = useState<Frame | null>(null);
@@ -49,21 +52,45 @@ export function useRf() {
 
   useEffect(() => {
     let stop = false;
+    let simTimer: number | null = null;
+
+    const startSim = async () => {
+      if (stop || simTimer != null) return;
+      const { simFrame } = await import("./simFrame");
+      if (stop || simTimer != null) return;
+      setConnected(true);
+      simTimer = window.setInterval(() => setFrame(simFrame()), 125);
+    };
+    const stopSim = () => {
+      if (simTimer != null) {
+        clearInterval(simTimer);
+        simTimer = null;
+      }
+    };
+
     const connect = () => {
       if (stop) return;
       const proto = location.protocol === "https:" ? "wss" : "ws";
       const ws = new WebSocket(`${proto}://${location.host}/ws`);
       wsRef.current = ws;
-      ws.onopen = () => setConnected(true);
-      ws.onclose = () => {
-        setConnected(false);
-        if (!stop) setTimeout(connect, 1500);
+      ws.onopen = () => {
+        stopSim();
+        setConnected(true);
       };
-      ws.onmessage = (e) => setFrame(JSON.parse(e.data) as Frame);
+      ws.onclose = () => {
+        if (stop) return;
+        startSim(); // browser-side fallback while the backend is away
+        setTimeout(connect, simTimer != null ? 10_000 : 1500);
+      };
+      ws.onmessage = (e) => {
+        if (simTimer != null) stopSim();
+        setFrame(JSON.parse(e.data) as Frame);
+      };
     };
     connect();
     return () => {
       stop = true;
+      stopSim();
       wsRef.current?.close();
     };
   }, []);
@@ -71,8 +98,10 @@ export function useRf() {
   return { connected, frame };
 }
 
-/** Retune the radio (each mission tunes to its band). */
+/** Retune the radio (each mission tunes to its band). Drives both the real
+ *  backend and the in-browser simulator, whichever is active. */
 export async function tune(center_mhz: number, sample_rate_msps?: number, gain_db?: number) {
+  import("./simFrame").then(({ simTune }) => simTune(center_mhz, sample_rate_msps, gain_db));
   try {
     await fetch("/api/tune", {
       method: "POST",
@@ -80,6 +109,6 @@ export async function tune(center_mhz: number, sample_rate_msps?: number, gain_d
       body: JSON.stringify({ center_mhz, sample_rate_msps, gain_db }),
     });
   } catch {
-    /* backend may be momentarily down; the WS reconnect loop covers UX */
+    /* no backend — the browser simulator already handled it */
   }
 }

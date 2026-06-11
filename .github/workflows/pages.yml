@@ -1,0 +1,47 @@
+name: deploy-pages
+# Deploys the static web app (with its in-browser simulator) to Cloudflare
+# Pages. No-op until the two secrets are configured in the repo settings:
+#   CLOUDFLARE_API_TOKEN   (My Profile → API Tokens → "Cloudflare Pages — Edit")
+#   CLOUDFLARE_ACCOUNT_ID  (dashboard right sidebar)
+# First run creates the project; the site lands on rf-academy.pages.dev,
+# then attach your custom domain from the Pages dashboard.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gate
+        run: |
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "ready=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare secrets not set — skipping Pages deploy."
+          else
+            echo "ready=1" >> "$GITHUB_OUTPUT"
+          fi
+      - name: check content links
+        run: node tools/check-links.mjs
+      - if: steps.gate.outputs.ready == '1'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - if: steps.gate.outputs.ready == '1'
+        name: build
+        run: cd web && npm ci && npm run build
+      - if: steps.gate.outputs.ready == '1'
+        name: deploy to Cloudflare Pages
+        run: npx wrangler@3 pages deploy web/dist --project-name=rf-academy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

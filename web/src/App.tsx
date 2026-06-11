@@ -553,34 +553,43 @@ function UpgradeModal({ onClose, onActivated }: { onClose: () => void; onActivat
           <li>⏱️ {t(STR.pro.f3)}</li>
           <li>❤️ {t(STR.pro.f4)}</li>
         </ul>
-        <div className="mt-4">
-          <input
-            value={key}
-            onChange={(e) => {
-              setKey(e.target.value);
-              setErr(false);
-            }}
-            placeholder={t(STR.pro.placeholder)}
-            className={`w-full rounded-lg border bg-ink px-3 py-2 font-mono text-sm outline-none ${
-              err ? "border-rose-500" : "border-edge focus:border-amber"
-            }`}
-          />
+
+        <a
+          href={DONATE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-5 block rounded-lg bg-amber px-5 py-2.5 text-center text-sm font-bold text-ink transition-transform hover:scale-[1.02]"
+        >
+          {t(STR.pro.getKey)}
+        </a>
+        <p className="mt-2 text-center text-xs text-muted">{t(STR.pro.getKeyHint)}</p>
+
+        <div className="mt-5 border-t border-edge/60 pt-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.pro.haveKey)}</div>
+          <div className="flex gap-2">
+            <input
+              value={key}
+              onChange={(e) => {
+                setKey(e.target.value);
+                setErr(false);
+              }}
+              placeholder={t(STR.pro.placeholder)}
+              className={`min-w-0 flex-1 rounded-lg border bg-ink px-3 py-2 font-mono text-sm outline-none ${
+                err ? "border-rose-500" : "border-edge focus:border-amber"
+              }`}
+            />
+            <button onClick={tryActivate} className="shrink-0 rounded-lg border border-amber/60 px-4 py-2 text-sm font-semibold text-amber hover:bg-amber/10">
+              {t(STR.pro.activate)}
+            </button>
+          </div>
           {err && <p className="mt-1 text-xs text-rose-400">{t(STR.pro.invalid)}</p>}
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
+
+        <div className="mt-4 text-center">
           <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
             {t(STR.pro.later)}
           </button>
-          <button onClick={tryActivate} className="rounded-lg bg-amber px-5 py-2 text-sm font-semibold text-ink">
-            {t(STR.pro.activate)}
-          </button>
         </div>
-        <p className="mt-4 border-t border-edge/60 pt-3 text-center text-xs text-muted">
-          {t(STR.donate.modalHint)}{" "}
-          <a href={DONATE_URL} target="_blank" rel="noreferrer" className="font-semibold text-phos hover:underline">
-            {t(STR.donate.coffee)}
-          </a>
-        </p>
       </div>
     </div>
   );
