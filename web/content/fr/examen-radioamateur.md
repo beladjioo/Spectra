@@ -14,4 +14,19 @@ Technique :
 
 Et tout ce que tu as déjà vu côté SDR s'applique directement : [[ondes-radio]], [[decibels]], [[bruit-et-snr]], [[modulations]], [[antennes]].
 
+## L'examen en pratique
+
+- **Inscription** auprès de l'ANFR (en ligne), passage en centre d'examen ; une redevance est due (de l'ordre de 30 € — vérifie le montant en vigueur sur le site de l'ANFR, qui fait foi).
+- **Format** : QCM sur ordinateur, deux domaines — réglementation et technique — avec un seuil à atteindre dans **chacun** (une excellente note en technique ne rattrape pas la réglementation).
+- **Réussite** : certificat d'opérateur (standard **HAREC**, reconnu en Europe via la CEPT) puis attribution de ton **indicatif**.
+
+## Plan de révision conseillé (4 semaines)
+
+1. **Semaine 1** — fondamentaux : [[ondes-radio]], [[decibels]], [[electricite]] + 10 min/jour de mode *Réviser*.
+2. **Semaine 2** — technique : [[composants-electroniques]], [[circuits-resonance-filtres]], [[emetteur-recepteur]], [[antennes]], [[lignes-ros-adaptation]].
+3. **Semaine 3** — réglementation et trafic : [[reglementation]], [[bandes-radioamateur]], [[code-q-phonetique-rst]], [[indicatifs-trafic-journal]], [[securite-cem]].
+4. **Semaine 4** — examens blancs chronométrés (onglet 🎓 Examen) jusqu'à passer confortablement le seuil dans les deux domaines.
+
+La répétition espacée fait le tri pour toi : les questions ratées reviennent vite, les acquises s'espacent. Dix minutes par jour battent deux heures le dimanche.
+
 > ⚠️ Réception ≠ émission. L'examen autorise à **émettre** (avec licence) ; l'académie reste en **écoute seule**. Voir [[legal-securite]].

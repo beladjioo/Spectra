@@ -50,7 +50,7 @@ export const SECTIONS: Section[] = [
   { title: { fr: "Spectre & DSP", en: "Spectrum & DSP" }, notes: ["fft-spectre", "waterfall"] },
   {
     title: { fr: "Le matériel", en: "The hardware" },
-    notes: ["sdr-architecture", "hackrf", "antennes"],
+    notes: ["materiel-debuter", "sdr-architecture", "hackrf", "antennes"],
   },
   { title: { fr: "Modulations", en: "Modulation" }, notes: ["modulations"] },
   {

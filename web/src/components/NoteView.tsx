@@ -11,10 +11,15 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
   const body = preprocess(note(slug, locale) ?? t(STR.library.notFound), locale);
   const bl = backlinks(slug, locale);
 
+  // Real links are underlined (dotted = note, solid = mission) so they can't
+  // be confused with highlighted `code` words, which are not clickable.
   const A = ({ href, children }: any) => {
     if (typeof href === "string" && href.startsWith("#note:")) {
       return (
-        <button onClick={() => onNote(href.slice(6))} className="text-phos underline-offset-2 hover:underline">
+        <button
+          onClick={() => onNote(href.slice(6))}
+          className="text-phos underline decoration-phos/50 decoration-dotted underline-offset-4 transition-colors hover:decoration-phos"
+        >
           {children}
         </button>
       );
@@ -23,14 +28,14 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
       return (
         <button
           onClick={() => onMission(href.slice(9))}
-          className="font-semibold text-amber underline-offset-2 hover:underline"
+          className="font-semibold text-amber underline decoration-amber/50 underline-offset-4 hover:decoration-amber"
         >
           {children}
         </button>
       );
     }
     return (
-      <a href={href} target="_blank" rel="noreferrer" className="text-phos hover:underline">
+      <a href={href} target="_blank" rel="noreferrer" className="text-phos underline underline-offset-4 hover:decoration-phos">
         {children}
       </a>
     );
@@ -66,7 +71,7 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
           em: ({ children }) => <em className="text-slate-200">{children}</em>,
           hr: () => <hr className="my-10 border-edge/60" />,
           code: ({ children }) => (
-            <code className="rounded bg-ink/80 px-1.5 py-0.5 font-mono text-[0.85em] text-phos">{children}</code>
+            <code className="rounded bg-ink/80 px-1.5 py-0.5 font-mono text-[0.85em] text-amber/90">{children}</code>
           ),
           blockquote: ({ children }) => (
             <blockquote className="my-6 rounded-r-lg border-l-2 border-amber/70 bg-amber/[0.06] px-5 py-3 text-[15px] leading-[1.7] text-amber/90">

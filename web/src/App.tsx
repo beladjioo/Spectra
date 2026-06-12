@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Spectrum from "./components/Spectrum";
 import Waterfall from "./components/Waterfall";
 import Library from "./components/Library";
@@ -6,6 +6,9 @@ import Console from "./components/Console";
 import Quiz from "./components/Quiz";
 import Journey from "./components/Journey";
 import AircraftTable from "./components/Aircraft";
+
+// Leaflet is heavy — only visitors who open the map pay for it
+const MapView = lazy(() => import("./components/MapView"));
 import { useRf, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE } from "./lib/library";
 import { activate, isPro } from "./lib/license";
@@ -24,7 +27,7 @@ const loadProgress = (): Progress => {
   }
 };
 
-type View = "home" | "mission" | "library" | "console" | "exam";
+type View = "home" | "mission" | "library" | "console" | "exam" | "map";
 
 export default function App() {
   const { t } = useI18n();
@@ -105,6 +108,10 @@ export default function App() {
           <SdrBanner connected={connected} frame={frame} />
           <Console frame={frame} onLearn={openNote} />
         </>
+      ) : view === "map" ? (
+        <Suspense fallback={<div className="rounded-2xl border border-edge bg-panel p-8 text-center text-sm text-muted">🗺️ …</div>}>
+          <MapView frame={frame} />
+        </Suspense>
       ) : view === "exam" ? (
         <Quiz pro={pro} onUpgrade={() => setShowUpgrade(true)} onLearn={openNote} />
       ) : view === "library" ? (
@@ -252,6 +259,7 @@ function Header({
         <nav className="flex flex-wrap gap-2">
           <Tab on={view === "home"} onClick={() => setView("home")} label={`🧭 ${t(STR.nav.journey)}`} />
           <Tab on={view === "console"} onClick={() => setView("console")} label={`🎛️ ${t(STR.nav.explore)}`} />
+          <Tab on={view === "map"} onClick={() => setView("map")} label={`🗺️ ${t(STR.nav.map)}`} />
           <Tab on={view === "exam"} onClick={() => setView("exam")} label={`🎓 ${t(STR.nav.exam)}`} />
           <Tab on={view === "library"} onClick={() => setView("library")} label={`📖 ${t(STR.nav.library)}`} />
         </nav>

@@ -46,6 +46,7 @@ export const STAGES: Stage[] = [
     steps: [
       { kind: "note", slug: "fft-spectre" },
       { kind: "note", slug: "waterfall" },
+      { kind: "note", slug: "materiel-debuter" },
       { kind: "note", slug: "hackrf" },
       { kind: "mission", id: "fm" },
     ],

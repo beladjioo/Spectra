@@ -52,8 +52,43 @@ export const STR = {
   nav: {
     journey: { fr: "Voyage", en: "Journey" },
     explore: { fr: "Explorer", en: "Explore" },
+    map: { fr: "Carte", en: "Map" },
     exam: { fr: "Examen", en: "Exam" },
     library: { fr: "Bibliothèque", en: "Library" },
+  },
+
+  map: {
+    title: { fr: "Ton ciel radio, vu d'en haut", en: "Your radio sky, from above" },
+    sub: {
+      fr: "Autorise la géolocalisation : la carte se centre sur toi, affiche les avions décodés en ADS-B autour de toi, et matérialise jusqu'où « porte » ce que tu écoutes.",
+      en: "Allow geolocation: the map centres on you, shows the ADS-B aircraft decoded around you, and shows how far what you're listening to can reach.",
+    },
+    locate: { fr: "📍 Me localiser", en: "📍 Locate me" },
+    locating: { fr: "localisation…", en: "locating…" },
+    you: { fr: "Toi (récepteur)", en: "You (receiver)" },
+    accuracy: { fr: "précision GPS", en: "GPS accuracy" },
+    denied: {
+      fr: "Géolocalisation refusée — la carte reste sur Montpellier. Tu peux l'autoriser dans les réglages du site.",
+      en: "Geolocation denied — the map stays on Montpellier. You can allow it in the site settings.",
+    },
+    aircraft: { fr: "avions décodés (1090 MHz)", en: "decoded aircraft (1090 MHz)" },
+    tuneAdsb: {
+      fr: "Accorde la radio sur 1090 MHz pour voir les avions →",
+      en: "Tune to 1090 MHz to see aircraft →",
+    },
+    ringHint: {
+      fr: "Les anneaux montrent la portée typique des signaux de la bande écoutée — sans antenne directive, on sait « jusqu'où » mais pas « d'où ».",
+      en: "The rings show the typical reach of signals in the tuned band — without a directional antenna you know “how far” but not “from where”.",
+    },
+    rings: {
+      fm: { fr: "stations FM · ~70 km", en: "FM stations · ~70 km" },
+      air: { fr: "tours de contrôle · ~150 km", en: "control towers · ~150 km" },
+      adsb: { fr: "avions en croisière · ~370 km", en: "cruising aircraft · ~370 km" },
+      ism: { fr: "capteurs ISM/LoRa · ~2 km", en: "ISM/LoRa sensors · ~2 km" },
+      wifi: { fr: "WiFi/Bluetooth · ~100 m", en: "WiFi/Bluetooth · ~100 m" },
+      drone: { fr: "liens vidéo drone · ~5 km", en: "drone video links · ~5 km" },
+      horizon: { fr: "horizon radio local · ~5 km", en: "local radio horizon · ~5 km" },
+    },
   },
 
   status: {
@@ -79,15 +114,15 @@ export const STR = {
   },
 
   usb: {
-    connect: { fr: "📡 Brancher mon RTL-SDR (USB)", en: "📡 Plug in my RTL-SDR (USB)" },
+    connect: { fr: "📡 Brancher mon SDR (USB)", en: "📡 Plug in my SDR (USB)" },
     disconnect: { fr: "Déconnecter le SDR", en: "Disconnect the SDR" },
     hint: {
-      fr: "Chrome/Edge uniquement. Branche une clé RTL-SDR (~30 €) et le navigateur la pilote directement — le traitement se fait sur ta machine, rien ne quitte ton ordinateur.",
-      en: "Chrome/Edge only. Plug in an RTL-SDR dongle (~$30) and the browser drives it directly — processing happens on your machine, nothing leaves your computer.",
+      fr: "Chrome/Edge uniquement. Branche une clé RTL-SDR (~30 €) ou un HackRF et le navigateur le pilote directement — le traitement se fait sur ta machine, rien ne quitte ton ordinateur.",
+      en: "Chrome/Edge only. Plug in an RTL-SDR dongle (~$30) or a HackRF and the browser drives it directly — processing happens on your machine, nothing leaves your computer.",
     },
     active: {
-      fr: "RTL-SDR branché en direct — le spectre que tu vois est réel (24–1766 MHz).",
-      en: "RTL-SDR live — the spectrum you see is real (24–1766 MHz).",
+      fr: "SDR branché en direct — le spectre que tu vois est réel.",
+      en: "SDR live — the spectrum you see is real.",
     },
     error: { fr: "Connexion impossible :", en: "Could not connect:" },
     unsupported: {

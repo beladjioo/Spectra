@@ -14,4 +14,21 @@ A bare [[ondes-radio|carrier]] says nothing. **Modulating** means varying one of
 
 **Recognising by eye**: bandwidth, stability, temporal pattern and frequency hopping in the waterfall often tell you *what kind* of signal you're looking at — before any decoding.
 
+## Waterfall identification table
+
+| Signal | Width | Pattern in the [[waterfall]] |
+|---|---|---|
+| FM broadcast | ~200 kHz | wide, continuous, stable stripe |
+| NFM (handhelds, repeaters) | 12.5 kHz | thin, intermittent line |
+| AM aviation | ~8 kHz | thin carrier + voice in bursts |
+| CW (Morse) | < 500 Hz | very fine dotted line |
+| FT8 (HF digital) | 50 Hz | small tiles every 15 s (14.074 MHz) |
+| LoRa | 125 kHz | brief diagonal chirps |
+| WiFi/OFDM | 20–40 MHz | wide, grainy block |
+| Mode S / ADS-B | ~2 MHz | ultra-short bursts |
+
+## What about digital voice?
+
+Modern handhelds (DMR, D-STAR, C4FM) carry voice **as bits** (4FSK and cousins): in the waterfall, a thin line with a steady rhythm — but nothing audible in FM; you need the right decoder. Detection vs decoding: [[decoder-vs-detecter]].
+
 > 👉 Spot a wideband OFDM signature: [Capstone — detect a drone](#mission:drone)

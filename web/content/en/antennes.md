@@ -11,4 +11,29 @@ Useful notions:
 
 In practice: keep **one antenna per major band** and swap per mission. Place it high, in the clear, away from noise (power supplies, USB, screens).
 
-Related: [[hackrf]] · [[bandes-a-explorer]]
+## Which antenna for what?
+
+| Type | Typical gain | Pattern | Best for |
+|---|---|---|---|
+| λ/2 dipole | 2.15 dBi | omni (⊥ plane) | starting out: FM, airband |
+| λ/4 ground plane | ~2 dBi | omni | fixed station, ISM |
+| Telescopic whip | varies | omni | multi-band exploration |
+| Discone | ~2 dBi | omni, **very wideband** | scanner listening 25 MHz–1.3 GHz |
+| Yagi | 7–15 dBi | directional | DX, signal hunting, satellites |
+| Collinear | 5–8 dBi | flattened omni | ADS-B (1090 MHz), repeaters |
+
+## λ/4 cheat sheet (element length)
+
+| Band | Frequency | λ/4 |
+|---|---|---|
+| FM | 100 MHz | 75 cm |
+| Aviation | 125 MHz | 60 cm |
+| 2 m | 145 MHz | 52 cm |
+| ISM 433 | 433 MHz | 17.3 cm |
+| ISM 868 | 868 MHz | 8.6 cm |
+| ADS-B | 1090 MHz | 6.9 cm |
+| WiFi | 2440 MHz | 3.1 cm |
+
+Placement golden rule: **height beats gain**. An average antenna, high and in the clear, beats an excellent antenna at the back of a room — and keep it away from switch-mode supplies, screens and USB cables that pollute the [[bruit-et-snr|floor]].
+
+Related: [[hackrf]] · [[bandes-a-explorer]] · [[materiel-debuter]]

@@ -11,4 +11,29 @@ Quelques notions utiles :
 
 En pratique : garde **une antenne par grande bande** et change selon la mission. Place-la haut, dégagée, loin du bruit (alimentations, USB, écrans).
 
-Lié : [[hackrf]] · [[bandes-a-explorer]]
+## Quelle antenne pour quoi ?
+
+| Type | Gain typique | Diagramme | Idéale pour |
+|---|---|---|---|
+| Dipôle λ/2 | 2,15 dBi | omni (plan ⊥) | tout débuter : FM, airband |
+| Ground plane λ/4 | ~2 dBi | omni | poste fixe, ISM |
+| Télescopique | variable | omni | exploration multi-bandes |
+| Discone | ~2 dBi | omni **très large bande** | écoute scanner 25 MHz–1,3 GHz |
+| Yagi | 7–15 dBi | directive | DX, chasse au signal, satellites |
+| Colinéaire | 5–8 dBi | omni aplatie | ADS-B (1090 MHz), relais |
+
+## Aide-mémoire λ/4 (longueur du brin)
+
+| Bande | Fréquence | λ/4 |
+|---|---|---|
+| FM | 100 MHz | 75 cm |
+| Aviation | 125 MHz | 60 cm |
+| 2 m | 145 MHz | 52 cm |
+| ISM 433 | 433 MHz | 17,3 cm |
+| ISM 868 | 868 MHz | 8,6 cm |
+| ADS-B | 1090 MHz | 6,9 cm |
+| WiFi | 2440 MHz | 3,1 cm |
+
+Règle d'or du placement : **la hauteur vaut mieux que le gain**. Une antenne moyenne, dégagée et en hauteur, bat une excellente antenne au fond d'une pièce — et éloigne-la des alimentations à découpage, écrans et câbles USB qui polluent le [[bruit-et-snr|plancher]].
+
+Lié : [[hackrf]] · [[bandes-a-explorer]] · [[materiel-debuter]]

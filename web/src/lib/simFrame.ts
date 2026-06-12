@@ -61,7 +61,15 @@ function synth(): Float32Array {
   return db;
 }
 
-/** Fake ADS-B traffic orbiting Montpellier (port of adsb.rs::sim_aircraft). */
+// Where the fake traffic orbits. Defaults to Montpellier; the map view moves
+// it over the user once geolocation is known, so the demo feels local.
+const origin = { lat: 43.61, lon: 3.88 };
+export function setSimOrigin(lat: number, lon: number) {
+  origin.lat = lat;
+  origin.lon = lon;
+}
+
+/** Fake ADS-B traffic orbiting the sim origin (port of adsb.rs::sim_aircraft). */
 function simAircraft(): Aircraft[] {
   const t = Date.now() / 1000;
   const planes: [string, string, number, number, number][] = [
@@ -78,8 +86,8 @@ function simAircraft(): Aircraft[] {
       speed_kt: kt,
       track_deg: ((w * 180) / Math.PI + 90) % 360,
       vrate_fpm: 0,
-      lat: 43.61 + 0.25 * Math.sin(w) + i * 0.08,
-      lon: 3.88 + 0.32 * Math.cos(w) - i * 0.05,
+      lat: origin.lat + 0.25 * Math.sin(w) + i * 0.08,
+      lon: origin.lon + 0.32 * Math.cos(w) - i * 0.05,
       msgs: 40 + (Math.floor(t) % 60) * (i + 1),
       age_s: i * 1.7,
     };

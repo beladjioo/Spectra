@@ -18,4 +18,28 @@ Sur ton analyseur, l'axe vertical du spectre est en dB. **Attention** : avec un 
 
 Ce qui compte vraiment n'est pas la valeur brute mais l'**écart** entre un signal et le plancher : c'est le SNR — voir [[bruit-et-snr]].
 
+## L'antisèche du décibel
+
+| dB | Rapport | | dB | Rapport |
+|---|---|---|---|---|
+| +3 | ×2 | | −3 | ÷2 |
+| +6 | ×4 | | −6 | ÷4 |
+| +10 | ×10 | | −10 | ÷10 |
+| +20 | ×100 | | −20 | ÷100 |
+| +30 | ×1000 | | −30 | ÷1000 |
+
+Tout se combine par **addition** : +13 dB = +10 puis +3 = ×20. C'est toute la magie du logarithme.
+
+## dBm, dBi, dBd — trois cousins à ne pas confondre
+
+- **dBm** : une *puissance* absolue, référencée à 1 mW (0 dBm = 1 mW ; +30 dBm = 1 W).
+- **dBi** : un *gain d'antenne*, référencé à l'antenne isotrope idéale.
+- **dBd** : le même gain, référencé au dipôle — 0 dBd = **2,15 dBi** (piège classique d'examen).
+
+Exemple de chaîne : émetteur +30 dBm → câble −3 dB → antenne +5 dBi ⇒ **PIRE ≈ +32 dBm**. On additionne, rien d'autre.
+
+## À toi de jouer
+
+En changeant d'antenne, ton signal passe de −90 à −70 dBm. Combien de fois plus de puissance reçue ? (+20 dB → **×100**.)
+
 > 👉 Lis l'axe en dB sur un vrai spectre : [Premier contact](#mission:first-contact)

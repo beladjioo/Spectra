@@ -18,4 +18,18 @@ The academy's missions train you on three of these bands:
 
 > 👉 [ISM 868](#mission:ism868) · [The 2.4 GHz chaos](#mission:wifi24) · [Catch an FM station](#mission:fm)
 
-Always think about the legal side before exploring: [[legal-securite]].
+## Going further: the hunting notebook
+
+| Band | What | Why it's fascinating |
+|---|---|---|
+| **27 MHz** | Citizen Band | truckers — the licence-free ancestor of it all |
+| **77.5 kHz** | DCF77 (German atomic clock) | the official time of millions of alarm clocks |
+| **131–137 MHz** | ACARS | airliners' "text messages", decodable |
+| **174–240 MHz** | DAB+ | digital radio, big OFDM blocks |
+| **400–406 MHz** | **Weather radiosondes** | balloons at 30 km altitude — some people recover them on the ground! |
+| **446 MHz** | PMR446 | licence-free walkie-talkies |
+| **466 MHz** | POCSAG | hospital pagers, still alive |
+
+Best hours: **ISM wakes up in daytime** (sensors, remotes), **HF opens in the evening** (propagation — see [[propagation]]), and **ADS-B never sleeps**.
+
+**Responsible listening**: observe and learn — never disclose the content of private communications, even decodable ones. Re-read [[legal-securite]] before exploring.
