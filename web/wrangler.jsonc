@@ -3,6 +3,7 @@
 // `npx wrangler deploy`, root directory: `web`).
 {
   "name": "rf-academy",
+  "account_id": "f1204316f97e4c90b760662c4b54828f",
   "compatibility_date": "2026-06-01",
   "assets": {
     "directory": "./dist",
