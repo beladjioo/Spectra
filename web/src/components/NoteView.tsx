@@ -58,9 +58,9 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
           h3: ({ children }) => (
             <h3 className="mb-2 mt-8 font-display text-lg font-semibold text-paperink">{children}</h3>
           ),
-          p: ({ children }) => <p className="mb-5 text-[17px] leading-[1.85] text-paperink/90">{children}</p>,
-          ul: ({ children }) => <ul className="mb-5 ml-1 list-none space-y-2 text-[17px] leading-[1.85] text-paperink/90">{children}</ul>,
-          ol: ({ children }) => <ol className="mb-5 ml-5 list-decimal space-y-2 text-[17px] leading-[1.85] text-paperink/90 marker:font-semibold marker:text-copper">{children}</ol>,
+          p: ({ children }) => <p className="mb-5 text-[17px] leading-[1.85] text-paperink">{children}</p>,
+          ul: ({ children }) => <ul className="mb-5 ml-1 list-none space-y-2 text-[17px] leading-[1.85] text-paperink">{children}</ul>,
+          ol: ({ children }) => <ol className="mb-5 ml-5 list-decimal space-y-2 text-[17px] leading-[1.85] text-paperink marker:font-semibold marker:text-copper">{children}</ol>,
           li: ({ children, ...p }) =>
             "ordered" in p && (p as any).ordered ? (
               <li className="pl-1">{children}</li>
@@ -84,7 +84,7 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
             </pre>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="my-6 rounded-r-lg border-l-[3px] border-copper bg-copper/[0.07] px-5 py-3 text-[16px] italic leading-[1.7] text-paperink/80">
+            <blockquote className="my-6 rounded-r-lg border-l-[3px] border-copper bg-copper/[0.07] px-5 py-3 text-[16px] italic leading-[1.7] text-paperink/90">
               {children}
             </blockquote>
           ),
@@ -96,7 +96,7 @@ export default function NoteView({ slug, onNote, onMission }: { slug: string } &
           th: ({ children }) => (
             <th className="border-b border-paperrule bg-paperink/[0.05] px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-papermut">{children}</th>
           ),
-          td: ({ children }) => <td className="border-b border-paperrule/70 px-4 py-2.5 text-paperink/90">{children}</td>,
+          td: ({ children }) => <td className="border-b border-paperrule/70 px-4 py-2.5 text-paperink">{children}</td>,
         }}
       >
         {body}

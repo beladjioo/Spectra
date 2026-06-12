@@ -45,7 +45,10 @@ export default function App() {
   }, [progress]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    // the library manages its own scroll (on stacked layouts the article sits
+    // below the sidebar — jumping to absolute top would hide the new note and
+    // make links feel dead)
+    if (view !== "library") window.scrollTo({ top: 0 });
   }, [view, note, activeId]);
 
   const active = useMemo(() => MISSIONS.find((m) => m.id === activeId) ?? null, [activeId]);

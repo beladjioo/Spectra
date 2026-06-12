@@ -124,10 +124,14 @@ export function readSlugs(): Set<string> {
 }
 
 export function markRead(slug: string) {
-  const s = readSlugs();
-  if (s.has(slug)) return;
-  s.add(slug);
-  localStorage.setItem(READ_KEY, JSON.stringify([...s]));
+  try {
+    const s = readSlugs();
+    if (s.has(slug)) return;
+    s.add(slug);
+    localStorage.setItem(READ_KEY, JSON.stringify([...s]));
+  } catch {
+    /* storage blocked (private mode) — reading must still work */
+  }
 }
 
 export function stepDone(step: Step, read: Set<string>, completed: string[]): boolean {

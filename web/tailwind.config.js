@@ -14,12 +14,13 @@ export default {
         signal: "#7dd3fc", // secondary data accent (sky)
         muted: "#697a8c",
         paper: "#e8e3d8", // reading-mode ivory (titles on dark surfaces)
-        // "Manuel & laboratoire" reading surface — ink on warm ivory paper
-        paperbg: "#efe8d8",
-        paperink: "#2a2620",
-        papermut: "#6f6655",
-        paperrule: "#d9cdb6",
-        copper: "#b06a39", // accent links / rules on paper (and dark surfaces)
+        // "Manuel & laboratoire" reading surface — ink on warm ivory paper.
+        // Tuned for contrast: ink ≥ 13:1, muted ≥ 6:1, copper links ≥ 5:1.
+        paperbg: "#f4eedd",
+        paperink: "#211c14",
+        papermut: "#5b5240",
+        paperrule: "#d8cbb0",
+        copper: "#8f4d20", // accent links / markers on paper (AA on paperbg)
       },
       fontFamily: {
         sans: ['"Hanken Grotesk"', "system-ui", "sans-serif"],

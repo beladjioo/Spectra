@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NoteView from "./NoteView";
 import Icon from "./Icon";
 import { SECTIONS, search, titleOf } from "../lib/library";
@@ -17,6 +17,15 @@ export default function Library({
   const { t, locale } = useI18n();
   const [q, setQ] = useState("");
   const results = search(q, locale);
+  const artRef = useRef<HTMLElement>(null);
+
+  // bring the (new) note into view on every navigation — crucial on narrow
+  // layouts where the article stacks below the sidebar
+  useEffect(() => {
+    const stacked = window.matchMedia("(max-width: 1023px)").matches;
+    if (stacked) artRef.current?.scrollIntoView({ block: "start", behavior: "instant" as ScrollBehavior });
+    else window.scrollTo({ top: 0 });
+  }, [slug]);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
@@ -55,7 +64,7 @@ export default function Library({
         </nav>
       </aside>
 
-      <section className="paper paper-bound rounded-2xl px-6 py-8 md:px-14 md:py-14">
+      <section ref={artRef} className="paper paper-bound scroll-mt-3 rounded-2xl px-6 py-8 md:px-14 md:py-14">
         <NoteView slug={slug} onNote={onSelect} onMission={onMission} />
       </section>
     </div>
