@@ -1,4 +1,5 @@
 import Spectrum from "./Spectrum";
+import Icon, { type IconName } from "./Icon";
 import type { Frame } from "../lib/useRf";
 import { useI18n, STR } from "../lib/i18n";
 import { STAGES, stageProgress, stageUnlocked, stepDone, missionById, type Stage, type Step } from "../journey";
@@ -16,13 +17,11 @@ export default function Journey({
   frame,
   read,
   completed,
-  pro,
   nav,
 }: {
   frame: Frame | null;
   read: Set<string>;
   completed: string[];
-  pro: boolean;
   nav: Nav;
 }) {
   const { t } = useI18n();
@@ -118,7 +117,6 @@ export default function Journey({
               progress={stageProgress(stage, read, completed)}
               read={read}
               completed={completed}
-              pro={pro}
               onStep={go}
             />
           ))}
@@ -146,7 +144,6 @@ function StageRow({
   progress,
   read,
   completed,
-  pro,
   onStep,
 }: {
   index: number;
@@ -155,7 +152,6 @@ function StageRow({
   progress: number;
   read: Set<string>;
   completed: string[];
-  pro: boolean;
   onStep: (s: Step) => void;
 }) {
   const { t, locale } = useI18n();
@@ -180,8 +176,8 @@ function StageRow({
             className="transition-all duration-700"
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-xl">
-          {unlocked ? stage.icon : "🔒"}
+        <span className={`absolute inset-0 flex items-center justify-center ${complete ? "text-phos" : "text-amber"}`}>
+          <Icon name={unlocked ? stage.icon : "lock"} size={22} />
         </span>
       </div>
 
@@ -206,8 +202,8 @@ function StageRow({
               {pct} % {t(STR.journey.progress)}
             </span>
           </div>
-          <h3 className="mt-1 font-display text-lg font-bold">
-            <span className="sm:hidden">{stage.icon} </span>
+          <h3 className="mt-1 flex items-center gap-2 font-display text-lg font-bold">
+            <Icon name={unlocked ? stage.icon : "lock"} size={18} className="text-amber sm:hidden" />
             {t(stage.title)}
           </h3>
           <p className="mt-1 text-sm leading-relaxed text-muted">{t(stage.hook)}</p>
@@ -219,14 +215,17 @@ function StageRow({
                 step={step}
                 done={stepDone(step, read, completed)}
                 disabled={!unlocked}
-                pro={pro}
                 locale={locale}
                 onClick={() => unlocked && onStep(step)}
               />
             ))}
           </div>
         </div>
-        {!unlocked && <p className="mt-3 text-xs text-amber/80">🔒 {t(STR.journey.locked)}</p>}
+        {!unlocked && (
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-amber/80">
+            <Icon name="lock" size={12} /> {t(STR.journey.locked)}
+          </p>
+        )}
       </div>
     </li>
   );
@@ -236,30 +235,26 @@ function StepChip({
   step,
   done,
   disabled,
-  pro,
   locale,
   onClick,
 }: {
   step: Step;
   done: boolean;
   disabled: boolean;
-  pro: boolean;
   locale: "fr" | "en";
   onClick: () => void;
 }) {
   const { t } = useI18n();
-  let icon = "📖";
+  let icon: IconName = "book";
   let label = "";
-  let needsPro = false;
   if (step.kind === "note") {
     label = titleOf(step.slug, locale);
   } else if (step.kind === "mission") {
     const m = missionById(step.id);
-    icon = "🎯";
+    icon = "target";
     label = m ? t(m.title) : step.id;
-    needsPro = !!m?.pro && !pro;
   } else {
-    icon = "🎓";
+    icon = "cap";
     label = t(STR.quiz.exam);
   }
 
@@ -270,14 +265,11 @@ function StepChip({
       className={`group flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
         done
           ? "border-phos/40 bg-phos/10 text-phos"
-          : needsPro
-            ? "border-amber/40 text-amber hover:bg-amber/10"
-            : "border-edge bg-ink/50 text-slate-300 hover:border-phos/50 hover:text-phos"
+          : "border-edge bg-ink/50 text-slate-300 hover:border-phos/50 hover:text-phos"
       } ${disabled ? "cursor-not-allowed" : ""}`}
     >
-      <span className="text-[11px]">{done ? "✓" : icon}</span>
+      <Icon name={done ? "check" : icon} size={12} />
       <span className="max-w-[24ch] truncate">{label}</span>
-      {needsPro && <span className="text-[9px] font-bold">PRO</span>}
     </button>
   );
 }

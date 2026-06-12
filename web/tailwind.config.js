@@ -13,7 +13,13 @@ export default {
         amber: "#ffb454", // VFO lamp
         signal: "#7dd3fc", // secondary data accent (sky)
         muted: "#697a8c",
-        paper: "#e8e3d8", // reading-mode ivory (titles in library)
+        paper: "#e8e3d8", // reading-mode ivory (titles on dark surfaces)
+        // "Manuel & laboratoire" reading surface — ink on warm ivory paper
+        paperbg: "#efe8d8",
+        paperink: "#2a2620",
+        papermut: "#6f6655",
+        paperrule: "#d9cdb6",
+        copper: "#b06a39", // accent links / rules on paper (and dark surfaces)
       },
       fontFamily: {
         sans: ['"Hanken Grotesk"', "system-ui", "sans-serif"],

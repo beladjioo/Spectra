@@ -1,5 +1,6 @@
 import { useState } from "react";
 import NoteView from "./NoteView";
+import Icon from "./Icon";
 import { SECTIONS, search, titleOf } from "../lib/library";
 import { useI18n, STR } from "../lib/i18n";
 
@@ -20,12 +21,15 @@ export default function Library({
   return (
     <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
       <aside className="flex max-h-[78vh] flex-col gap-3 rounded-2xl border border-edge bg-panel p-3 lg:sticky lg:top-4">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={`🔎 ${t(STR.library.search)}`}
-          className="w-full rounded-lg border border-edge bg-ink px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-phos"
-        />
+        <div className="relative">
+          <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t(STR.library.search)}
+            className="w-full rounded-lg border border-edge bg-ink py-2 pl-9 pr-3 text-sm outline-none placeholder:text-muted focus:border-phos"
+          />
+        </div>
         <nav className="-mr-1 overflow-y-auto pr-1">
           {q.trim() ? (
             <ul className="flex flex-col gap-0.5">
@@ -51,7 +55,7 @@ export default function Library({
         </nav>
       </aside>
 
-      <section className="rounded-2xl border border-edge/70 bg-panel px-6 py-8 md:px-12 md:py-12">
+      <section className="paper paper-bound rounded-2xl px-6 py-8 md:px-14 md:py-14">
         <NoteView slug={slug} onNote={onSelect} onMission={onMission} />
       </section>
     </div>

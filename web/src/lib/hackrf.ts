@@ -17,6 +17,7 @@ const REQ_BASEBAND_FILTER_BANDWIDTH_SET = 7;
 const REQ_VERSION_STRING_READ = 15;
 const REQ_SET_FREQ = 16;
 const REQ_AMP_ENABLE = 17;
+const REQ_BOARD_PARTID_SERIALNO_READ = 18;
 const REQ_SET_LNA_GAIN = 19;
 const REQ_SET_VGA_GAIN = 20;
 
@@ -32,6 +33,7 @@ const FILTER_BW = [
 export class HackRf {
   private constructor(private dev: USBDevice) {}
   firmware = "";
+  serial = "";
 
   static async open(dev: USBDevice): Promise<HackRf> {
     await dev.open();
@@ -39,6 +41,7 @@ export class HackRf {
     await dev.claimInterface(0);
     const h = new HackRf(dev);
     h.firmware = await h.readVersion();
+    h.serial = (await h.readSerial()) || dev.serialNumber || "";
     return h;
   }
 
@@ -63,6 +66,23 @@ export class HackRf {
     try {
       const d = await this.ctrlIn(REQ_VERSION_STRING_READ, 64);
       return new TextDecoder().decode(d.buffer.slice(0, d.byteLength));
+    } catch {
+      return "";
+    }
+  }
+
+  /** Board serial — read_partid_serialno_t { u32 part_id[2]; u32 serial_no[4] },
+      formatted like hackrf_info (leading all-zero words dropped). */
+  private async readSerial(): Promise<string> {
+    try {
+      const d = await this.ctrlIn(REQ_BOARD_PARTID_SERIALNO_READ, 24);
+      if (d.byteLength < 24) return "";
+      const words: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        words.push(d.getUint32(8 + 4 * i, true).toString(16).padStart(8, "0"));
+      }
+      while (words.length > 2 && words[0] === "00000000") words.shift();
+      return words.join("");
     } catch {
       return "";
     }

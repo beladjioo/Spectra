@@ -4,8 +4,9 @@ import "leaflet/dist/leaflet.css";
 import type { Frame } from "../lib/useRf";
 import { tune } from "../lib/useRf";
 import { useI18n, STR, type LStr } from "../lib/i18n";
+import Icon from "./Icon";
 
-const DEFAULT_POS: [number, number] = [43.61, 3.88]; // Montpellier until located
+const WORLD_VIEW: [number, number] = [30, 5]; // a neutral world view until located
 
 /** Typical reception ranges per band — pedagogy, not measurement. */
 function ringsFor(centerMhz: number): { km: number; label: LStr; color: string }[] {
@@ -30,15 +31,15 @@ export default function MapView({ frame }: { frame: Frame | null }) {
   const youRef = useRef<{ dot: L.CircleMarker; acc: L.Circle } | null>(null);
   const ringsRef = useRef<L.LayerGroup | null>(null);
   const planesRef = useRef<Map<string, L.Marker>>(new Map());
-  const posRef = useRef<[number, number]>(DEFAULT_POS);
+  const posRef = useRef<[number, number] | null>(null);
   const [located, setLocated] = useState<"no" | "pending" | "yes" | "denied">("no");
 
   /* map bootstrap */
   useEffect(() => {
     if (!divRef.current || mapRef.current) return;
-    const map = L.map(divRef.current, { zoomControl: true, attributionControl: true }).setView(
-      DEFAULT_POS,
-      9,
+    const map = L.map(divRef.current, { zoomControl: true, attributionControl: true, worldCopyJump: true }).setView(
+      WORLD_VIEW,
+      2,
     );
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -101,12 +102,12 @@ export default function MapView({ frame }: { frame: Frame | null }) {
     );
   };
 
-  /* coverage rings follow the tuned band */
+  /* coverage rings follow the tuned band — only once we know where "here" is */
   const centerMhz = frame?.center_mhz ?? 0;
   useEffect(() => {
     const map = mapRef.current;
     const layer = ringsRef.current;
-    if (!map || !layer || !centerMhz) return;
+    if (!map || !layer || !centerMhz || !posRef.current) return;
     layer.clearLayers();
     for (const ring of ringsFor(centerMhz)) {
       const c = L.circle(posRef.current, {
@@ -121,15 +122,18 @@ export default function MapView({ frame }: { frame: Frame | null }) {
     }
   }, [Math.round(centerMhz), located, t]); // eslint-disable-line
 
-  /* aircraft markers track the live frames */
+  /* aircraft markers track the live frames — shown once the user is located
+     (so the demo traffic, which orbits the user, has a real place to be) */
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const seen = new Set<string>();
-    for (const a of frame?.aircraft ?? []) {
+    const list = located === "yes" ? frame?.aircraft ?? [] : [];
+    for (const a of list) {
       if (a.lat == null || a.lon == null) continue;
       seen.add(a.icao);
-      const html = `<div style="transform:rotate(${(a.track_deg ?? 0) - 45}deg);font-size:22px;line-height:1;filter:drop-shadow(0 0 4px rgba(125,211,252,.8))">✈️</div>`;
+      // a small phosphor plane glyph, rotated to the aircraft's heading
+      const html = `<svg viewBox="0 0 24 24" width="22" height="22" style="transform:rotate(${a.track_deg ?? 0}deg);filter:drop-shadow(0 0 4px rgba(125,211,252,.85))" fill="#7dd3fc"><path d="M21 15.5 13.5 11V5a1.5 1.5 0 0 0-3 0v6L3 15.5V18l7.5-2v3L8 20.5V22l4-1 4 1v-1.5L13.5 19v-3L21 18v-2.5z"/></svg>`;
       const icon = L.divIcon({ html, className: "", iconSize: [22, 22], iconAnchor: [11, 11] });
       const pop = `<b>${a.callsign ?? a.icao}</b><br/>${a.alt_ft != null ? a.alt_ft.toLocaleString() + " ft · " : ""}${
         a.speed_kt != null ? a.speed_kt.toFixed(0) + " kt" : ""
@@ -150,16 +154,18 @@ export default function MapView({ frame }: { frame: Frame | null }) {
         planesRef.current.delete(icao);
       }
     }
-  }, [frame?.aircraft]); // eslint-disable-line
+  }, [frame?.aircraft, located]); // eslint-disable-line
 
-  const nAircraft = (frame?.aircraft ?? []).filter((a) => a.lat != null).length;
+  const nAircraft = located === "yes" ? (frame?.aircraft ?? []).filter((a) => a.lat != null).length : 0;
   const onAdsb = centerMhz >= 1080 && centerMhz < 1100;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rise flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-edge bg-panel p-5">
         <div>
-          <h2 className="font-display text-lg font-bold">🗺️ {t(STR.map.title)}</h2>
+          <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+            <Icon name="map" size={20} className="text-phos" /> {t(STR.map.title)}
+          </h2>
           <p className="mt-1 max-w-[64ch] text-sm text-muted">{t(STR.map.sub)}</p>
         </div>
         <button
@@ -183,8 +189,9 @@ export default function MapView({ frame }: { frame: Frame | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
         <span>{t(STR.map.ringHint)}</span>
         {onAdsb ? (
-          <span className="font-mono">
-            ✈️ <b className="text-signal">{nAircraft}</b> {t(STR.map.aircraft)}
+          <span className="flex items-center gap-1.5 font-mono">
+            <Icon name="plane" size={13} className="text-signal" />
+            <b className="text-signal">{nAircraft}</b> {t(STR.map.aircraft)}
           </span>
         ) : (
           <button onClick={() => tune(1090, 8, 40)} className="text-phos underline-offset-2 hover:underline">

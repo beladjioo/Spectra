@@ -1,6 +1,12 @@
 // Cloudflare Workers config: serve the built app as a static-assets Worker.
-// Used by Cloudflare's Git integration (build: `npm run build`, deploy:
-// `npx wrangler deploy`, root directory: `web`).
+// Deploy manually from `web/` with `npx wrangler deploy` (wrangler is OAuth-
+// logged-in on the maintainer's machine).
+//
+// NOTE on naming: the Worker is still named `rf-academy` so the existing
+// workers.dev URL (https://rf-academy.spectra-rf.workers.dev) and the new
+// custom domain both serve the *same* latest deployment — one Worker, two
+// hostnames, no duplicate to keep in sync. The public brand is **OpenHertz**;
+// production is openhertz.org (registered via Cloudflare Registrar, 2026-06-12).
 {
   "name": "rf-academy",
   "account_id": "f1204316f97e4c90b760662c4b54828f",
@@ -8,5 +14,12 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+
+  // Cloudflare provisions and renews TLS automatically, and the static-assets
+  // pipeline is edge-cached out of the box. Both apex and www point here.
+  "routes": [
+    { "pattern": "openhertz.org", "custom_domain": true },
+    { "pattern": "www.openhertz.org", "custom_domain": true }
+  ]
 }

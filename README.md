@@ -1,113 +1,117 @@
-# RF Academy — apprends la radio en la pratiquant, avec un vrai SDR
+# OpenHertz — learn radio by doing it, with a real SDR
 
-> La « bible du SDR » gamifiée : branche un **RTL-SDR (~30 €)** ou un **HackRF**,
-> et progresse mission par mission — lire un spectre, capter une station FM
-> (démodulée en direct), surprendre un burst LoRa, survivre au chaos du 2.4 GHz,
-> **décoder les avions en ADS-B**, et détecter un drone. Moteur RF et backend
-> 100 % **Rust** ; UI React ; base de connaissances en français ; préparation à
-> l'**examen radioamateur** intégrée.
+> A gamified "SDR handbook": plug in an **RTL-SDR (~$30)** or a **HackRF**, or use
+> the built-in simulator, and progress mission by mission — read a spectrum,
+> catch an FM station (demodulated live in your browser), surprise a LoRa burst,
+> survive the 2.4 GHz chaos, **decode aircraft over ADS-B**, and detect a drone.
+> All-**Rust** DSP engine; React UI; a bilingual (FR/EN) Obsidian-style library;
+> built-in **amateur-radio exam** preparation.
 
-Passif, **réception seule** — le SDR ne fait qu'écouter, rien n'est jamais émis.
+**100% free and open source.** Passive, **receive-only** — the SDR only ever
+listens; nothing is transmitted. Development is funded entirely by voluntary
+[donations on Ko-fi](https://ko-fi.com/spectrarf).
 
-## Pourquoi
+## Why
 
-- **La RF est intimidante.** Les outils SDR classiques jettent un mur de boutons
-  à la figure. RF Academy est un parcours guidé et gamifié, de « c'est quoi un
-  dB ? » jusqu'à « j'ai décodé un avion de ligne ».
-- **Du vrai décodage, pas que de la détection.** Le moteur Rust démodule la FM
-  (désaccentuation 50 µs comprise) et décode le Mode S/ADS-B (CRC-24, CPR
-  global) — sur le CPU d'un Pi 5, sans GPU.
-- **Ça marche toujours.** Sans matériel, un simulateur intégré prend le relais :
-  l'app se démontre, se teste en CI, et sert de démo gratuite.
-- **En français.** Curriculum, bibliothèque type Obsidian (wikilinks,
-  backlinks) et QCM type ANFR — une niche que personne ne couvre.
+- **RF is intimidating.** Classic SDR tools throw a wall of knobs at you.
+  OpenHertz is a guided, gamified path from "what's a dB?" to "I just decoded an
+  airliner."
+- **Real decoding, not just detection.** The engine demodulates FM (50 µs
+  de-emphasis included) and decodes Mode S/ADS-B (CRC-24, global CPR position) —
+  and now does it **entirely in the browser** via WebUSB + a TypeScript DSP, so
+  there's no server to run.
+- **It always works.** With no hardware, a built-in simulator takes over: the app
+  demos itself, is tested in CI, and runs as a fully functional free site.
+- **Bilingual, exam-focused.** Curriculum, Obsidian-style library (wikilinks,
+  backlinks) and ANFR-style quiz in both French and English — a niche no one else
+  covers well.
 
-## Gratuit vs Pro
+## What you get (all of it, for free)
 
-| | Gratuit | Pro |
-|---|---|---|
-| Missions 1–4 (spectre, FM, ISM 868, 2.4 GHz) | ✅ | ✅ |
-| Console SDR libre + écoute FM démodulée | ✅ | ✅ |
-| Bibliothèque complète (27 notes) | ✅ | ✅ |
-| Révision examen (répétition espacée, 40 questions) | ✅ | ✅ |
-| ✈️ **Radar ADS-B** (décodage réel des avions) | — | ✅ |
-| 🚁 **Capstone drone** (lien vidéo large bande) | — | ✅ |
-| ⏱️ **Examens blancs** chronométrés, notés par domaine | — | ✅ |
+| | |
+|---|---|
+| Guided 5-stage journey, from first dB to the licence | ✅ |
+| Free-tuning SDR console + live FM demodulation | ✅ |
+| Geolocated coverage map + live ADS-B aircraft | ✅ |
+| Full bilingual library (30+ notes), wikilinks & backlinks | ✅ |
+| Exam prep: spaced-repetition revision **and** timed mock exams | ✅ |
+| Electronic-warfare & battlefield-drones chapters | ✅ |
+| Drive a real RTL-SDR / HackRF from the browser (WebUSB, Chrome/Edge) | ✅ |
 
-La licence est une clé hors-ligne (`RFA-XXXXXX-XXXX`, générée par
-`tools/genkey.mjs`) : l'appareil fonctionne sans internet, souvent en zone
-blanche. C'est une barrière honnête, pas du DRM — le code est Apache-2.0, la
-clé finance le contenu.
+No accounts, no keys, no paywall. If the tool teaches you something, you can
+support its development on Ko-fi — that's the whole business model.
 
-## Architecture — une image, un binaire
+## Three ways to run the radio
+
+OpenHertz arbitrates between signal sources automatically, best first:
+
+1. **WebUSB (recommended, zero server).** In Chrome/Edge, plug in an RTL-SDR or a
+   HackRF and the browser drives it directly — all DSP runs on *your* machine.
+2. **Backend appliance.** The Rust server (axum + tokio + rustfft + soapysdr)
+   owns a locally-attached SDR and streams frames over WebSocket. Designed for a
+   Raspberry Pi 5 homelab (k3s + ArgoCD), ideal for fixed/white-zone installs.
+3. **In-browser simulator.** No hardware at all: synthetic spectra and ADS-B
+   traffic, so the site is fully usable by anyone.
 
 ```
-NŒUD (Pi 5 + SDR, k3s + ArgoCD)            ┌─ navigateur (LAN ou AP WiFi du Pi)
-  rf-academy (Rust, DaemonSet, USB)         │   missions · console · examen · bibliothèque
-   ┌──────────────────────────────────────┐ │
-   │ SDR (HackRF/RTL-SDR, hot-plug)        │ │
-   │  → rustfft (fenêtre Hann) → spectre   │ │
-   │  → démod FM → PCM /audio (WS)         ├─┘  POST /api/tune
-   │  → décodeur ADS-B 1090 (CRC, CPR)     │    GET  /ws (frames JSON)
-   │ axum : UI React embarquée + WS        │
-   └──────────────────────────────────────┘
-      :8090 → NodePort 30920
+ browser (Chrome/Edge)                         optional appliance (Pi 5 + SDR)
+  ┌───────────────────────────────┐             ┌──────────────────────────────┐
+  │ WebUSB driver (RTL / HackRF)  │             │ Rust: SDR → rustfft (Hann)   │
+  │  → client DSP (FFT, FM, ADS-B)│             │   → FM demod → PCM (WS)      │
+  │  → React UI                   │  ── or ──>  │   → ADS-B 1090 (CRC, CPR)    │
+  │  → in-browser simulator       │   WS /ws    │ axum serves the same UI      │
+  └───────────────────────────────┘             └──────────────────────────────┘
 ```
 
-Pas de MQTT, pas de gateway, pas de nginx — un seul binaire Rust possède la
-radio, fait le DSP et sert l'UI. Sans SDR branché : simulateur (spectres et
-trafic ADS-B synthétiques).
-
-## Dépôt
+## Repository
 
 ```
 .
-├── server/               # backend Rust (axum + tokio + rustfft + soapysdr)
-│   ├── src/dsp.rs        # analyse spectrale + démod FM (testés)
-│   └── src/adsb.rs       # décodeur Mode S/ADS-B complet (testé sur vecteurs connus)
-├── web/                  # UI React + Tailwind : missions, console, examen, bibliothèque
-│   ├── content/          # la base de connaissances (markdown, wikilinks)
-│   └── src/quiz.ts       # banque de questions type ANFR
-├── tools/genkey.mjs      # génération de clés Pro
-├── Dockerfile            # une image : UI → Rust → runtime (HackRF + RTL-SDR)
-├── apps/rf-academy/      # k8s : namespace + configmap + DaemonSet + NodePort
-└── clusters/rf-academy/  # ArgoCD app-of-apps + bootstrap-pi.sh par nœud
+├── web/                  # React + Tailwind UI (missions, console, map, exam, library)
+│   ├── src/lib/dsp.ts    # client-side DSP: radix-2 FFT, FM demod, frame extraction
+│   ├── src/lib/webusb.ts # WebUSB lifecycle (RTL-SDR + HackRF), hot retune, audio
+│   ├── src/lib/hackrf.ts # from-scratch HackRF One WebUSB driver (libhackrf subset)
+│   ├── content/{fr,en}/  # the bilingual knowledge base (markdown, wikilinks)
+│   └── src/quiz.ts       # ANFR-style question bank
+├── server/               # optional Rust backend (axum + tokio + rustfft + soapysdr)
+│   ├── src/dsp.rs        # spectral analysis + FM demod (unit-tested)
+│   └── src/adsb.rs       # full Mode S/ADS-B decoder (tested against known vectors)
+├── apps/ & clusters/     # k8s + ArgoCD GitOps for the Pi 5 appliance
+└── Dockerfile            # one image: UI → Rust → runtime (HackRF + RTL-SDR)
 ```
 
-## Déployer (GitOps — la vraie voie)
+## Local development
 
 ```bash
-# Sur un Pi 5 vierge (arm64), SDR branché en USB :
-sudo ./clusters/rf-academy/bootstrap-pi.sh
-# installe k3s + ArgoCD, applique l'app-of-apps ; ArgoCD tire l'image et la fait tourner.
+# Static site (WebUSB + simulator) — no backend needed:
+cd web && npm install && npm run build && npx vite preview
+
+# Optional Rust backend with a real or simulated SDR:
+cd server && SDR_SIM=1 STATIC_DIR=../web/dist cargo run --release   # → http://localhost:8090
+cargo test        # DSP + ADS-B decoder (canonical test vectors)
 ```
 
-UI depuis le téléphone/laptop : `http://<ip-du-pi>:30920` — ou en **zone
-blanche**, rejoindre l'AP WiFi `RF-Academy` (5 GHz) du Pi → `http://10.42.0.1:30920`.
+## The curriculum
 
-## Dev local
+| Mission | Band | What you learn |
+|---|---|---|
+| First contact | FM 98 MHz | spectrum, noise floor, dB, gain |
+| Catch an FM station | 100.2 MHz | carriers, SNR, FM modulation |
+| ISM 868 | 868.3 MHz | IoT/LoRa bursts, duty-cycle |
+| The 2.4 GHz chaos | 2.44 GHz | WiFi/BT, OFDM, occupancy |
+| ADS-B radar | 1090 MHz | PPM demodulation, CRC, CPR decoding |
+| Capstone: drone | 2.44 GHz | wideband video-link detection |
 
-```bash
-cd web && npm install && npm run build
-cd ../server && STATIC_DIR=../web/dist cargo run --release   # SDR auto-détecté, sinon sim
-# → http://localhost:8090
-cargo test        # DSP + décodeur ADS-B (vecteurs de test canoniques)
-```
+Plus the **Exam** tab: ANFR-style questions (regulations + technical) with
+spaced repetition, and a timed mock exam scored per domain — and a full
+**electronic warfare & drones** section in the library.
 
-## Le curriculum
+## Deployment
 
-| Mission | Bande | Tu apprends | |
-|---|---|---|---|
-| 📡 Premier contact | FM 98 MHz | spectre, bruit de fond, dB, gain | gratuit |
-| 📻 Capter une radio FM | 100.2 MHz | porteuses, SNR, modulation FM | gratuit |
-| 📶 ISM 868 | 868.3 MHz | bursts IoT/LoRa, duty-cycle | gratuit |
-| 🌐 Le chaos du 2.4 GHz | 2.44 GHz | WiFi/BT, OFDM, occupation | gratuit |
-| ✈️ Radar ADS-B | 1090 MHz | démodulation PPM, CRC, décodage CPR | **Pro** |
-| 🚁 Capstone : drone | 2.44 GHz | détection de lien vidéo large bande | **Pro** |
+The site is a Cloudflare static-assets Worker. Build with `npm run build` and
+deploy from `web/` with `npx wrangler deploy`. See `docs/GO-LIVE.md` for the
+homelab/Cloudflare architecture.
 
-Plus l'onglet **🎓 Examen** : 40 questions type ANFR (réglementation +
-technique) en répétition espacée, et l'examen blanc chronométré (Pro).
+## License
 
-## Licence
-
-Code sous Apache-2.0 (voir `LICENSE`).
+Code under Apache-2.0 (see `LICENSE`). Free forever; supported by donations.

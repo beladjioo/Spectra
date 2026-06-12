@@ -61,9 +61,9 @@ function synth(): Float32Array {
   return db;
 }
 
-// Where the fake traffic orbits. Defaults to Montpellier; the map view moves
-// it over the user once geolocation is known, so the demo feels local.
-const origin = { lat: 43.61, lon: 3.88 };
+// Where the fake traffic orbits. A neutral default; the map view moves it
+// over the user once geolocation is known, so the demo feels local.
+const origin = { lat: 30, lon: 5 };
 export function setSimOrigin(lat: number, lon: number) {
   origin.lat = lat;
   origin.lon = lon;

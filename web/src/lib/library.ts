@@ -50,12 +50,16 @@ export const SECTIONS: Section[] = [
   { title: { fr: "Spectre & DSP", en: "Spectrum & DSP" }, notes: ["fft-spectre", "waterfall"] },
   {
     title: { fr: "Le matériel", en: "The hardware" },
-    notes: ["materiel-debuter", "sdr-architecture", "hackrf", "antennes"],
+    notes: ["materiel-debuter", "sdr-architecture", "hackrf", "antennes", "reglage-antenne"],
   },
   { title: { fr: "Modulations", en: "Modulation" }, notes: ["modulations"] },
   {
     title: { fr: "En pratique", en: "In practice" },
     notes: ["workflow-live", "bandes-a-explorer", "decoder-vs-detecter", "legal-securite"],
+  },
+  {
+    title: { fr: "Guerre électronique & drones", en: "Electronic warfare & drones" },
+    notes: ["guerre-electronique", "drones-champ-bataille"],
   },
   {
     title: { fr: "Radioamateur — réglementation & trafic", en: "Ham radio — regulations & operating" },

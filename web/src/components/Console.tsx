@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Spectrum from "./Spectrum";
 import Waterfall from "./Waterfall";
 import AircraftTable from "./Aircraft";
+import Icon from "./Icon";
 import { tune, type Frame } from "../lib/useRf";
 import { useI18n, STR, fmt, type LStr } from "../lib/i18n";
 
@@ -62,8 +63,8 @@ export default function Console({
   };
 
   const startAudio = () => {
-    // WebUSB SDR: the webusb module demodulates and plays the audio itself
-    if (frame?.sdr.driver === "rtlsdr-webusb") {
+    // WebUSB SDR (RTL or HackRF): the webusb module demodulates and plays itself
+    if (frame?.sdr.driver.endsWith("-webusb")) {
       import("../lib/webusb").then(({ usbSetAudio }) => usbSetAudio(true));
       setListening(true);
       return;
@@ -148,14 +149,17 @@ export default function Console({
           </div>
           <button
             onClick={listening ? stopAudio : startAudio}
-            className={`mt-3 w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+            className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
               listening ? "bg-rose-500 text-white" : "bg-phos text-ink"
             }`}
           >
-            {listening ? `■ ${t(STR.console.stop)}` : `🔊 ${t(STR.console.listenFm)}`}
+            <Icon name={listening ? "stop" : "headphones"} size={16} />
+            {listening ? t(STR.console.stop) : t(STR.console.listenFm)}
           </button>
           <p className="mt-1 text-xs text-muted">{t(STR.console.listenHint)}</p>
         </section>
+
+        <StationFinder frame={frame} onTune={setFreq} onLearn={onLearn} />
 
         {/* spectrum + waterfall */}
         <section className="crt border border-edge/70 p-4">
@@ -167,8 +171,8 @@ export default function Console({
         </section>
         {(frame?.aircraft?.length ?? 0) > 0 && (
           <section className="rounded-2xl border border-edge bg-panel p-4">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              ✈️ {t(STR.mission.aircraft)}
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
+              <Icon name="plane" size={14} /> {t(STR.mission.aircraft)}
             </h3>
             <AircraftTable list={frame!.aircraft} />
           </section>
@@ -262,6 +266,76 @@ export default function Console({
         </section>
       </div>
     </div>
+  );
+}
+
+/* ── station finder: rank what the radio hears, one click to tune ────────── */
+
+function StationFinder({
+  frame,
+  onTune,
+  onLearn,
+}: {
+  frame: Frame | null;
+  onTune: (mhz: number) => void;
+  onLearn: (slug: string) => void;
+}) {
+  const { t } = useI18n();
+  // wideband "peaks" (WiFi, drone links) aren't listenable stations
+  const peaks = (frame?.peaks ?? []).filter((p) => !p.wideband).slice(0, 5);
+
+  const quality = (snr: number) =>
+    snr >= 25
+      ? { label: t(STR.console.qExcellent), cls: "text-phos" }
+      : snr >= 14
+        ? { label: t(STR.console.qGood), cls: "text-amber" }
+        : { label: t(STR.console.qWeak), cls: "text-rose-400" };
+
+  return (
+    <section className="rounded-2xl border border-edge bg-panel p-4">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+        {t(STR.console.stations)}
+      </h3>
+      {peaks.length === 0 ? (
+        <p className="text-sm text-muted">{t(STR.console.noStations)}</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {peaks.map((p) => {
+            const q = quality(p.snr_db);
+            return (
+              <button
+                key={p.center_mhz}
+                onClick={() => onTune(+p.center_mhz.toFixed(3))}
+                className="group flex items-center gap-3 rounded-lg border border-edge bg-ink px-3 py-2 text-left transition-colors hover:border-phos"
+              >
+                <span className="w-24 shrink-0 font-mono text-sm text-amber">
+                  {p.center_mhz.toFixed(2)} <span className="text-[10px] text-muted">MHz</span>
+                </span>
+                {/* SNR bar — the "how loud above the noise" meter */}
+                <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-edge">
+                  <span
+                    className="block h-full rounded-full bg-gradient-to-r from-rose-400 via-amber to-phos transition-all"
+                    style={{ width: `${Math.min(100, (p.snr_db / 35) * 100)}%` }}
+                  />
+                </span>
+                <span className={`w-20 shrink-0 text-right font-mono text-[11px] ${q.cls}`}>
+                  {p.snr_db.toFixed(0)} dB · {q.label}
+                </span>
+                <span className="shrink-0 rounded-md border border-edge px-2 py-0.5 text-[11px] text-muted transition-colors group-hover:border-phos group-hover:text-phos">
+                  {t(STR.console.tuneTo)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-2 text-xs text-muted">
+        {t(STR.console.antennaTip)}{" "}
+        <button onClick={() => onLearn("reglage-antenne")} className="text-phos underline-offset-2 hover:underline">
+          {t(STR.console.antennaGuide)}
+        </button>
+      </p>
+    </section>
   );
 }
 

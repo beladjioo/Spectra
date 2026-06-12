@@ -3,13 +3,14 @@
 // Stages are addressed by a frequency — the journey climbs the spectrum.
 
 import type { LStr } from "./lib/i18n";
+import type { IconName } from "./components/Icon";
 import { MISSIONS } from "./missions";
 
 export type Step = { kind: "note"; slug: string } | { kind: "mission"; id: string } | { kind: "exam" };
 
 export type Stage = {
   id: string;
-  icon: string;
+  icon: IconName;
   /** The stage's "address" on the dial — the journey climbs the spectrum. */
   dial: string;
   title: LStr;
@@ -20,7 +21,7 @@ export type Stage = {
 export const STAGES: Stage[] = [
   {
     id: "discover",
-    icon: "🌱",
+    icon: "sprout",
     dial: "98 MHz",
     title: { fr: "Découvrir", en: "Discover" },
     hook: {
@@ -36,7 +37,7 @@ export const STAGES: Stage[] = [
   },
   {
     id: "hands-on",
-    icon: "🧪",
+    icon: "flask",
     dial: "100.2 MHz",
     title: { fr: "Premières manips", en: "First experiments" },
     hook: {
@@ -53,7 +54,7 @@ export const STAGES: Stage[] = [
   },
   {
     id: "intermediate",
-    icon: "📶",
+    icon: "burst",
     dial: "868 MHz",
     title: { fr: "Monter en fréquence", en: "Climbing the spectrum" },
     hook: {
@@ -65,13 +66,14 @@ export const STAGES: Stage[] = [
       { kind: "note", slug: "iq" },
       { kind: "note", slug: "modulations" },
       { kind: "note", slug: "antennes" },
+      { kind: "note", slug: "reglage-antenne" },
       { kind: "mission", id: "ism868" },
       { kind: "mission", id: "wifi24" },
     ],
   },
   {
     id: "advanced",
-    icon: "✈️",
+    icon: "plane",
     dial: "1090 MHz",
     title: { fr: "Décoder le réel", en: "Decoding the real world" },
     hook: {
@@ -84,12 +86,14 @@ export const STAGES: Stage[] = [
       { kind: "note", slug: "workflow-live" },
       { kind: "note", slug: "legal-securite" },
       { kind: "mission", id: "adsb" },
+      { kind: "note", slug: "guerre-electronique" },
+      { kind: "note", slug: "drones-champ-bataille" },
       { kind: "mission", id: "drone" },
     ],
   },
   {
     id: "licence",
-    icon: "🎓",
+    icon: "cap",
     dial: "144 MHz",
     title: { fr: "Vers la licence", en: "Toward the licence" },
     hook: {

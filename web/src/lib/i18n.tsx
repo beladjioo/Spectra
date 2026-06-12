@@ -63,13 +63,13 @@ export const STR = {
       fr: "Autorise la géolocalisation : la carte se centre sur toi, affiche les avions décodés en ADS-B autour de toi, et matérialise jusqu'où « porte » ce que tu écoutes.",
       en: "Allow geolocation: the map centres on you, shows the ADS-B aircraft decoded around you, and shows how far what you're listening to can reach.",
     },
-    locate: { fr: "📍 Me localiser", en: "📍 Locate me" },
+    locate: { fr: "Me localiser", en: "Locate me" },
     locating: { fr: "localisation…", en: "locating…" },
     you: { fr: "Toi (récepteur)", en: "You (receiver)" },
     accuracy: { fr: "précision GPS", en: "GPS accuracy" },
     denied: {
-      fr: "Géolocalisation refusée — la carte reste sur Montpellier. Tu peux l'autoriser dans les réglages du site.",
-      en: "Geolocation denied — the map stays on Montpellier. You can allow it in the site settings.",
+      fr: "Géolocalisation refusée — la carte reste en vue monde. Tu peux l'autoriser dans les réglages du site.",
+      en: "Geolocation denied — the map stays on the world view. You can allow it in the site settings.",
     },
     aircraft: { fr: "avions décodés (1090 MHz)", en: "decoded aircraft (1090 MHz)" },
     tuneAdsb: {
@@ -114,7 +114,7 @@ export const STR = {
   },
 
   usb: {
-    connect: { fr: "📡 Brancher mon SDR (USB)", en: "📡 Plug in my SDR (USB)" },
+    connect: { fr: "Brancher mon SDR (USB)", en: "Plug in my SDR (USB)" },
     disconnect: { fr: "Déconnecter le SDR", en: "Disconnect the SDR" },
     hint: {
       fr: "Chrome/Edge uniquement. Branche une clé RTL-SDR (~30 €) ou un HackRF et le navigateur le pilote directement — le traitement se fait sur ta machine, rien ne quitte ton ordinateur.",
@@ -210,6 +210,21 @@ export const STR = {
     understand: { fr: "Comprendre", en: "Understand" },
     strongestPeak: { fr: "Pic le plus fort :", en: "Strongest peak:" },
     wide: { fr: "de large", en: "wide" },
+    stations: { fr: "Signaux captés — clique pour t'accorder", en: "Signals heard — click to tune" },
+    noStations: {
+      fr: "Aucun signal net pour l'instant. Monte doucement le gain, vérifie que l'antenne est branchée et dégagée, ou change de fréquence.",
+      en: "No clear signal yet. Raise the gain gently, check the antenna is connected and in the clear, or try another frequency.",
+    },
+    tuneTo: { fr: "écouter", en: "listen" },
+    qExcellent: { fr: "excellente", en: "excellent" },
+    qGood: { fr: "bonne", en: "good" },
+    qWeak: { fr: "faible", en: "weak" },
+    reception: { fr: "réception", en: "reception" },
+    antennaTip: {
+      fr: "Une antenne à la bonne longueur change tout :",
+      en: "An antenna cut to the right length changes everything:",
+    },
+    antennaGuide: { fr: "guide de réglage d'antenne", en: "antenna tuning guide" },
     helpSpectrum: { fr: "lire le spectre", en: "reading the spectrum" },
     helpWaterfall: { fr: "le waterfall", en: "the waterfall" },
     helpGain: { fr: "le gain", en: "gain" },
@@ -276,43 +291,21 @@ export const STR = {
     },
   },
 
-  pro: {
-    badge: { fr: "PRO", en: "PRO" },
-    upgrade: { fr: "passer Pro", en: "go Pro" },
-    title2: { fr: "Pro", en: "Pro" },
-    f1: {
-      fr: "Radar ADS-B — décode les avions en vrai (indicatif, altitude, position)",
-      en: "ADS-B radar — decode real aircraft (callsign, altitude, position)",
+  support: {
+    cta: { fr: "Soutenir", en: "Support" },
+    title: { fr: "Un outil libre, financé par vous", en: "A free tool, funded by you" },
+    body1: {
+      fr: "OpenHertz est entièrement gratuit : missions, examen blanc, bibliothèque, pilotage SDR — tout, pour tout le monde, sans compte ni clé.",
+      en: "OpenHertz is completely free: missions, mock exam, library, SDR control — everything, for everyone, no account, no key.",
     },
-    f2: {
-      fr: "Capstone drone — la détection de lien vidéo large bande",
-      en: "Drone capstone — wideband video-link detection",
+    body2: {
+      fr: "Si l'outil t'apprend quelque chose, tu peux financer son développement du prix d'un café. Chaque don paie de nouveaux chapitres, décodeurs et fonctionnalités.",
+      en: "If this tool teaches you something, you can fund its development for the price of a coffee. Every donation pays for new chapters, decoders and features.",
     },
-    f3: {
-      fr: "Examens blancs chronométrés, notés par domaine comme à l'ANFR",
-      en: "Timed mock exams, scored per domain like the real thing",
-    },
-    f4: {
-      fr: "et tu finances un outil indépendant, open-source et 100 % hors-ligne",
-      en: "and you fund an independent, open-source, fully offline tool",
-    },
-    getKey: {
-      fr: "☕ Soutenir le projet & recevoir ma clé",
-      en: "☕ Support the project & get my key",
-    },
-    getKeyHint: {
-      fr: "Fais un don du montant de ton choix sur Buy Me a Coffee en laissant ton email — ta clé Supporter arrive en retour.",
-      en: "Donate any amount on Buy Me a Coffee and leave your email — your Supporter key comes right back.",
-    },
-    haveKey: { fr: "Déjà une clé ?", en: "Already have a key?" },
-    placeholder: { fr: "RFA-XXXXXX-XXXX", en: "RFA-XXXXXX-XXXX" },
-    invalid: {
-      fr: "Clé invalide — vérifie le format RFA-XXXXXX-XXXX.",
-      en: "Invalid key — check the RFA-XXXXXX-XXXX format.",
-    },
+    donate: { fr: "Faire un don sur Ko-fi", en: "Donate on Ko-fi" },
+    star: { fr: "Étoile sur GitHub", en: "Star on GitHub" },
+    free: { fr: "100 % gratuit · open source · réception seule", en: "100% free · open source · receive-only" },
     later: { fr: "plus tard", en: "later" },
-    activate: { fr: "Activer ma clé", en: "Activate my key" },
-    activated: { fr: "Licence Pro activée — bienvenue à bord ✓", en: "Pro licence activated — welcome aboard ✓" },
   },
 
   aircraft: {
@@ -332,18 +325,14 @@ export const STR = {
 
   footer: {
     line: {
-      fr: "RF Academy · HackRF / RTL-SDR · réception seule",
-      en: "RF Academy · HackRF / RTL-SDR · receive-only",
+      fr: "OpenHertz · HackRF / RTL-SDR · réception seule",
+      en: "OpenHertz · HackRF / RTL-SDR · receive-only",
     },
   },
 
   donate: {
     support: { fr: "Soutenir", en: "Support" },
-    modalHint: {
-      fr: "Pas de clé ? Le projet vit aussi de vos dons :",
-      en: "No key? The project also lives on donations:",
-    },
-    coffee: { fr: "☕ Offrir un café", en: "☕ Buy me a coffee" },
+    coffee: { fr: "Offrir un café", en: "Buy me a coffee" },
   },
 
   toast: {

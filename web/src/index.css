@@ -79,6 +79,24 @@ body::after {
   font-family: theme("fontFamily.serif");
 }
 
+/* ── "Manuel & laboratoire": the reading surface is a printed page ────────── */
+.paper {
+  background-color: theme("colors.paperbg");
+  /* a faint laid-paper grain + warm vignette, so the ivory feels like stock */
+  background-image:
+    radial-gradient(1200px 700px at 50% -10%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(900px 700px at 100% 110%, rgba(176, 106, 57, 0.06), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.4'/%3E%3C/svg%3E");
+  color: theme("colors.paperink");
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 24px 60px -30px rgba(0, 0, 0, 0.7);
+}
+/* a thin copper rule running down the binding edge of the page */
+.paper-bound {
+  border-left: 3px solid theme("colors.copper");
+}
+
 ::selection {
   background: rgba(74, 242, 200, 0.25);
 }

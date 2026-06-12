@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import Icon from "./Icon";
 import { byCategory, shuffled, CATEGORY_LABEL, QUESTIONS, type Category, type Question } from "../quiz";
 import { useI18n, STR, fmt } from "../lib/i18n";
 import { EXAM_DONE_KEY } from "../journey";
@@ -24,27 +25,23 @@ const PASS_RATIO = 0.5; // ≥ la moitié dans chaque domaine, comme à l'ANFR
 
 type ExamState = {
   questions: Question[];
+  /** Per-question display order of the choices — authored data always lists
+      the correct answer first, so it must never be shown unshuffled. */
+  order: Record<string, number[]>;
   answers: Record<string, number>;
   endsAt: number;
   finished: boolean;
 };
 
-export default function Quiz({
-  pro,
-  onUpgrade,
-  onLearn,
-}: {
-  pro: boolean;
-  onUpgrade: () => void;
-  onLearn: (slug: string) => void;
-}) {
+/** Shuffled display order for a question's choices (indices into q.choices). */
+const choiceOrder = (q: Question) => shuffled(q.choices.map((_, i) => i));
+
+export default function Quiz({ onLearn }: { onLearn: (slug: string) => void }) {
   const [mode, setMode] = useState<"menu" | "train" | "exam">("menu");
 
   return (
     <div className="flex flex-col gap-4">
-      {mode === "menu" && (
-        <Menu pro={pro} onTrain={() => setMode("train")} onExam={() => setMode("exam")} onUpgrade={onUpgrade} />
-      )}
+      {mode === "menu" && <Menu onTrain={() => setMode("train")} onExam={() => setMode("exam")} />}
       {mode === "train" && <Train onBack={() => setMode("menu")} onLearn={onLearn} />}
       {mode === "exam" && <Exam onBack={() => setMode("menu")} onLearn={onLearn} />}
     </div>
@@ -64,23 +61,15 @@ function srsStats() {
   return { acquired, learning, fresh: QUESTIONS.length - acquired - learning };
 }
 
-function Menu({
-  pro,
-  onTrain,
-  onExam,
-  onUpgrade,
-}: {
-  pro: boolean;
-  onTrain: () => void;
-  onExam: () => void;
-  onUpgrade: () => void;
-}) {
+function Menu({ onTrain, onExam }: { onTrain: () => void; onExam: () => void }) {
   const { t } = useI18n();
   const stats = useMemo(srsStats, []);
   return (
     <>
       <div className="rise rounded-2xl border border-edge bg-panel p-5">
-        <h2 className="font-display text-lg font-bold">🎓 {t(STR.quiz.title)}</h2>
+        <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+          <Icon name="cap" size={20} className="text-phos" /> {t(STR.quiz.title)}
+        </h2>
         <p className="mt-1 text-sm text-muted">{fmt(t(STR.quiz.intro), { n: QUESTIONS.length })}</p>
         <p className="mt-2 font-mono text-xs text-muted">
           <b className="text-phos">{stats.acquired}</b> {t(STR.quiz.acquired)} ·{" "}
@@ -96,21 +85,16 @@ function Menu({
           className="rise rounded-2xl border border-edge bg-panel p-5 text-left transition-colors hover:border-phos/60"
           style={{ animationDelay: "80ms" }}
         >
-          <div className="text-3xl">📚</div>
+          <Icon name="book" size={26} className="text-phos" />
           <h3 className="mt-2 font-display font-bold">{t(STR.quiz.train)}</h3>
           <p className="mt-1 text-sm text-muted">{t(STR.quiz.trainSub)}</p>
         </button>
         <button
-          onClick={pro ? onExam : onUpgrade}
+          onClick={onExam}
           className="rise relative rounded-2xl border border-edge bg-panel p-5 text-left transition-colors hover:border-amber/60"
           style={{ animationDelay: "140ms" }}
         >
-          {!pro && (
-            <span className="absolute right-4 top-4 rounded-full border border-amber/50 bg-amber/10 px-2 py-0.5 text-[11px] font-bold text-amber">
-              PRO
-            </span>
-          )}
-          <div className="text-3xl">⏱️</div>
+          <Icon name="trophy" size={26} className="text-amber" />
           <h3 className="mt-2 font-display font-bold">{t(STR.quiz.exam)}</h3>
           <p className="mt-1 text-sm text-muted">
             {fmt(t(STR.quiz.examSub), { n: QUESTIONS.length, m: EXAM_MINUTES })}
@@ -181,12 +165,16 @@ function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string
 
 function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string) => void }) {
   const { t } = useI18n();
-  const [exam, setExam] = useState<ExamState>(() => ({
-    questions: [...shuffled(byCategory("reglementation")), ...shuffled(byCategory("technique"))],
-    answers: {},
-    endsAt: Date.now() + EXAM_MINUTES * 60_000,
-    finished: false,
-  }));
+  const [exam, setExam] = useState<ExamState>(() => {
+    const questions = [...shuffled(byCategory("reglementation")), ...shuffled(byCategory("technique"))];
+    return {
+      questions,
+      order: Object.fromEntries(questions.map((q) => [q.id, choiceOrder(q)])),
+      answers: {},
+      endsAt: Date.now() + EXAM_MINUTES * 60_000,
+      finished: false,
+    };
+  });
   const [, tick] = useState(0);
 
   // horloge
@@ -219,7 +207,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
         <div
           className={`rounded-2xl border p-6 text-center ${passed ? "border-phos/50 bg-phos/10" : "border-rose-500/50 bg-rose-500/5"}`}
         >
-          <div className="text-4xl">{passed ? "🏆" : "📚"}</div>
+          <Icon name={passed ? "trophy" : "book"} size={36} className={`mx-auto ${passed ? "text-phos" : "text-amber"}`} />
           <h2 className="mt-2 font-display text-xl font-bold">{passed ? t(STR.quiz.passed) : t(STR.quiz.failed)}</h2>
           <p className="mt-2 font-mono text-sm text-slate-300">
             {t(CATEGORY_LABEL.reglementation)} : {reg.ok}/{reg.total} {reg.pass ? "✓" : "✗"} ·{" "}
@@ -273,7 +261,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
             {t(q.q)}
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {q.choices.map((c, ci) => (
+            {(exam.order[q.id] ?? q.choices.map((_, k) => k)).map((ci) => (
               <button
                 key={ci}
                 onClick={() => setExam((e) => ({ ...e, answers: { ...e.answers, [q.id]: ci } }))}
@@ -281,7 +269,7 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
                   exam.answers[q.id] === ci ? "border-phos bg-phos/10 text-phos" : "border-edge bg-ink hover:border-phos/50"
                 }`}
               >
-                {t(c)}
+                {t(q.choices[ci])}
               </button>
             ))}
           </div>
@@ -314,6 +302,8 @@ function QuestionCard({
 }) {
   const { t } = useI18n();
   const revealed = review || picked != null;
+  // never present the choices in authored order (the correct one comes first)
+  const order = useMemo(() => choiceOrder(q), [q.id]); // eslint-disable-line
   return (
     <div className="rounded-2xl border border-edge bg-panel p-5">
       <span className="rounded-full border border-edge px-2 py-0.5 text-[11px] text-muted">
@@ -321,7 +311,7 @@ function QuestionCard({
       </span>
       <p className="mt-2 text-sm leading-relaxed">{t(q.q)}</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {q.choices.map((c, i) => {
+        {order.map((i) => {
           let cls = "border-edge bg-ink hover:border-phos/50";
           if (revealed) {
             if (i === q.answer) cls = "border-phos bg-phos/10 text-phos";
@@ -335,19 +325,22 @@ function QuestionCard({
               onClick={() => onPick(i)}
               className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${cls}`}
             >
-              {t(c)}
+              {t(q.choices[i])}
             </button>
           );
         })}
       </div>
       {revealed && (
-        <div className="mt-3 rounded-lg border border-edge bg-ink p-3 text-sm text-slate-300">
-          💡 {t(q.why)}{" "}
-          {q.note && (
-            <button onClick={() => onLearn(q.note!)} className="text-phos underline-offset-2 hover:underline">
-              {t(STR.quiz.revise)}
-            </button>
-          )}
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-edge bg-ink p-3 text-sm text-slate-300">
+          <Icon name="spark" size={15} className="mt-0.5 shrink-0 text-amber" />
+          <span>
+            {t(q.why)}{" "}
+            {q.note && (
+              <button onClick={() => onLearn(q.note!)} className="text-phos underline-offset-2 hover:underline">
+                {t(STR.quiz.revise)}
+              </button>
+            )}
+          </span>
         </div>
       )}
     </div>

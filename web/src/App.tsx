@@ -6,13 +6,13 @@ import Console from "./components/Console";
 import Quiz from "./components/Quiz";
 import Journey from "./components/Journey";
 import AircraftTable from "./components/Aircraft";
+import Icon from "./components/Icon";
 
 // Leaflet is heavy — only visitors who open the map pay for it
 const MapView = lazy(() => import("./components/MapView"));
 import { useRf, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE } from "./lib/library";
-import { activate, isPro } from "./lib/license";
-import { DONATE_URL } from "./lib/links";
+import { DONATE_URL, GITHUB_URL } from "./lib/links";
 import { useI18n, STR, type Locale } from "./lib/i18n";
 import { markRead, readSlugs } from "./journey";
 import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
@@ -37,8 +37,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [note, setNote] = useState<string>(FIRST_NOTE);
   const [toast, setToast] = useState<string | null>(null);
-  const [pro, setPro] = useState(isPro);
-  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const [read, setRead] = useState<Set<string>>(readSlugs);
 
   useEffect(() => {
@@ -52,10 +51,6 @@ export default function App() {
   const active = useMemo(() => MISSIONS.find((m) => m.id === activeId) ?? null, [activeId]);
 
   const openMission = (m: Mission) => {
-    if (m.pro && !pro) {
-      setShowUpgrade(true);
-      return;
-    }
     setActiveId(m.id);
     setView("mission");
     tune(m.band.center_mhz, m.band.sample_rate_msps, m.band.gain_db);
@@ -86,8 +81,7 @@ export default function App() {
         xp={progress.xp}
         view={view}
         setView={setView}
-        pro={pro}
-        onUpgrade={() => setShowUpgrade(true)}
+        onSupport={() => setShowSupport(true)}
       />
 
       {view === "home" ? (
@@ -95,7 +89,6 @@ export default function App() {
           frame={frame}
           read={read}
           completed={progress.completed}
-          pro={pro}
           nav={{
             onMission: openMissionById,
             onNote: openNote,
@@ -109,11 +102,11 @@ export default function App() {
           <Console frame={frame} onLearn={openNote} />
         </>
       ) : view === "map" ? (
-        <Suspense fallback={<div className="rounded-2xl border border-edge bg-panel p-8 text-center text-sm text-muted">🗺️ …</div>}>
+        <Suspense fallback={<div className="rounded-2xl border border-edge bg-panel p-8 text-center text-sm text-muted">…</div>}>
           <MapView frame={frame} />
         </Suspense>
       ) : view === "exam" ? (
-        <Quiz pro={pro} onUpgrade={() => setShowUpgrade(true)} onLearn={openNote} />
+        <Quiz onLearn={openNote} />
       ) : view === "library" ? (
         <Library slug={note} onSelect={openNote} onMission={openMissionById} />
       ) : view === "mission" && active ? (
@@ -138,29 +131,13 @@ export default function App() {
           {t(STR.footer.line)} ·{" "}
           {frame?.sim ? t(STR.status.sim) : connected ? t(STR.status.live) : t(STR.status.offline)}
         </span>
-        {pro ? (
-          <span className="rounded-full border border-amber/40 px-2 py-0.5 font-semibold text-amber">PRO</span>
-        ) : (
-          <button onClick={() => setShowUpgrade(true)} className="text-phos underline-offset-2 hover:underline">
-            {t(STR.pro.upgrade)}
-          </button>
-        )}
+        <span>· {t(STR.support.free)} ·</span>
         <a href={DONATE_URL} target="_blank" rel="noreferrer" className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
           {t(STR.donate.coffee)}
         </a>
       </footer>
 
-      {showUpgrade && (
-        <UpgradeModal
-          onClose={() => setShowUpgrade(false)}
-          onActivated={() => {
-            setPro(true);
-            setShowUpgrade(false);
-            setToast(t(STR.pro.activated));
-            setTimeout(() => setToast(null), 3200);
-          }}
-        />
-      )}
+      {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-pulse rounded-full border border-phos bg-phos/15 px-5 py-2.5 font-display text-sm font-bold text-phos shadow-lg">
@@ -179,16 +156,14 @@ function Header({
   xp,
   view,
   setView,
-  pro,
-  onUpgrade,
+  onSupport,
 }: {
   connected: boolean;
   frame: Frame | null;
   xp: number;
   view: View;
   setView: (v: View) => void;
-  pro: boolean;
-  onUpgrade: () => void;
+  onSupport: () => void;
 }) {
   const { t } = useI18n();
   const lvl = levelFor(xp);
@@ -198,11 +173,14 @@ function Header({
   return (
     <header className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button onClick={() => setView("home")} className="flex items-baseline gap-3 text-left">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight">
-            RF<span className="text-phos">Academy</span>
-          </h1>
-          <span className="hidden text-sm italic text-muted sm:inline">{t(STR.tagline)}</span>
+        <button onClick={() => setView("home")} className="flex items-center gap-2.5 text-left">
+          <Icon name="burst" size={26} className="text-phos" />
+          <span className="flex items-baseline gap-3">
+            <h1 className="font-display text-2xl font-extrabold tracking-tight">
+              Open<span className="text-phos">Hertz</span>
+            </h1>
+            <span className="hidden text-sm italic text-muted sm:inline">{t(STR.tagline)}</span>
+          </span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -222,46 +200,38 @@ function Header({
                 !connected ? "bg-rose-500" : frame?.sim ? "bg-amber" : "animate-pulse-dot bg-phos"
               }`}
             />
-            {!connected
-              ? t(STR.status.offline)
-              : frame?.sim
-                ? `🔌 ${t(STR.status.sim)}`
-                : `📡 ${frame?.sdr.label || "SDR"} · ${t(STR.status.live)}`}
+            {!connected ? (
+              t(STR.status.offline)
+            ) : frame?.sim ? (
+              <>
+                <Icon name="flask" size={12} /> {t(STR.status.sim)}
+              </>
+            ) : (
+              <>
+                <Icon name="radio" size={12} /> {frame?.sdr.label || "SDR"} · {t(STR.status.live)}
+              </>
+            )}
           </span>
-          <span className="hidden rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted lg:inline">
-            🛡️ {t(STR.status.passive)}
+          <span className="hidden items-center gap-1.5 rounded-full border border-edge bg-panel px-3 py-1.5 text-xs text-muted lg:flex">
+            <Icon name="shield" size={13} /> {t(STR.status.passive)}
           </span>
-          <a
-            href={DONATE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-full border border-edge bg-panel px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-phos hover:text-phos"
+          <button
+            onClick={onSupport}
+            className="flex items-center gap-1.5 rounded-full border border-amber/50 bg-amber/10 px-3 py-1.5 text-xs font-semibold text-amber transition-colors hover:bg-amber/20"
           >
-            ☕ {t(STR.donate.support)}
-          </a>
-          {pro ? (
-            <span className="rounded-full border border-amber/50 bg-amber/10 px-3 py-1.5 text-xs font-bold text-amber">
-              PRO
-            </span>
-          ) : (
-            <button
-              onClick={onUpgrade}
-              className="rounded-full border border-amber/40 px-3 py-1.5 text-xs font-semibold text-amber transition-colors hover:bg-amber/10"
-            >
-              {t(STR.pro.upgrade)}
-            </button>
-          )}
+            <Icon name="coffee" size={14} /> {t(STR.donate.support)}
+          </button>
           <LangSwitch />
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap gap-2">
-          <Tab on={view === "home"} onClick={() => setView("home")} label={`🧭 ${t(STR.nav.journey)}`} />
-          <Tab on={view === "console"} onClick={() => setView("console")} label={`🎛️ ${t(STR.nav.explore)}`} />
-          <Tab on={view === "map"} onClick={() => setView("map")} label={`🗺️ ${t(STR.nav.map)}`} />
-          <Tab on={view === "exam"} onClick={() => setView("exam")} label={`🎓 ${t(STR.nav.exam)}`} />
-          <Tab on={view === "library"} onClick={() => setView("library")} label={`📖 ${t(STR.nav.library)}`} />
+          <Tab on={view === "home"} onClick={() => setView("home")} icon="compass" label={t(STR.nav.journey)} />
+          <Tab on={view === "console"} onClick={() => setView("console")} icon="sliders" label={t(STR.nav.explore)} />
+          <Tab on={view === "map"} onClick={() => setView("map")} icon="map" label={t(STR.nav.map)} />
+          <Tab on={view === "exam"} onClick={() => setView("exam")} icon="cap" label={t(STR.nav.exam)} />
+          <Tab on={view === "library"} onClick={() => setView("library")} icon="book" label={t(STR.nav.library)} />
         </nav>
 
         <div className="flex items-center gap-3">
@@ -286,14 +256,25 @@ function Header({
   );
 }
 
-function Tab({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+function Tab({
+  on,
+  onClick,
+  icon,
+  label,
+}: {
+  on: boolean;
+  onClick: () => void;
+  icon: Parameters<typeof Icon>[0]["name"];
+  label: string;
+}) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
         on ? "bg-phos text-ink" : "border border-edge bg-panel text-slate-300 hover:border-phos"
       }`}
     >
+      <Icon name={icon} size={16} />
       {label}
     </button>
   );
@@ -352,25 +333,25 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
   if (!connected || !frame) {
     return (
       <div className="flex items-center gap-3 rounded-2xl border border-edge bg-panel p-4">
-        <span className="text-2xl">🔌</span>
+        <Icon name="plug" size={22} className="text-muted" />
         <div className="text-sm text-muted">{t(STR.status.connecting)}</div>
       </div>
     );
   }
   const s = frame.sdr;
-  const viaUsb = s.driver === "rtlsdr-webusb";
+  const viaUsb = s.driver.endsWith("-webusb");
   if (s.present) {
     return (
       <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-phos/40 bg-phos/5 p-4">
-        <span className="text-2xl">📡</span>
+        <Icon name="radio" size={24} className="text-phos" />
         <div className="min-w-0 flex-1">
           <div className="font-display font-bold text-phos">
             {s.label || "SDR"} {t(STR.sdr.detected)}
           </div>
           <div className="truncate font-mono text-xs text-muted">
-            {viaUsb
-              ? t(STR.usb.active)
-              : `${s.serial ? `${t(STR.sdr.serial)} ${s.serial}` : t(STR.sdr.noSerial)} · ${t(STR.sdr.driver)} ${s.driver}`}
+            {viaUsb ? t(STR.usb.active) : `${t(STR.sdr.driver)} ${s.driver}`}
+            {" · "}
+            {s.serial ? `${t(STR.sdr.serial)} ${s.serial}` : t(STR.sdr.noSerial)}
           </div>
         </div>
         {viaUsb && (
@@ -390,7 +371,7 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-amber/40 bg-amber/5 p-4">
       <div className="flex items-center gap-4">
-        <span className="text-2xl">🔌</span>
+        <Icon name="plug" size={24} className="text-amber" />
         <div className="min-w-0 flex-1">
           <div className="font-display font-bold text-amber">{t(STR.sdr.none)}</div>
           <div className="text-xs text-muted">{usbOk ? t(STR.usb.hint) : t(STR.usb.unsupported)}</div>
@@ -403,9 +384,9 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
         <button
           onClick={plug}
           disabled={busy}
-          className="self-start rounded-lg bg-phos px-4 py-2 text-sm font-bold text-ink transition-transform hover:scale-[1.02] disabled:opacity-50"
+          className="flex items-center gap-1.5 self-start rounded-lg bg-phos px-4 py-2 text-sm font-bold text-ink transition-transform hover:scale-[1.02] disabled:opacity-50"
         >
-          {busy ? "…" : t(STR.usb.connect)}
+          <Icon name="plug" size={15} /> {busy ? "…" : t(STR.usb.connect)}
         </button>
       )}
       {err && (
@@ -482,9 +463,9 @@ function MissionView({
         </button>
         <button
           onClick={() => onLearn(LEARN[m.id] ?? "bienvenue")}
-          className="rounded-lg border border-edge bg-panel px-3 py-1.5 text-sm text-slate-300 hover:border-phos"
+          className="flex items-center gap-1.5 rounded-lg border border-edge bg-panel px-3 py-1.5 text-sm text-slate-300 hover:border-phos"
         >
-          📖 {t(STR.mission.theory)}
+          <Icon name="book" size={14} /> {t(STR.mission.theory)}
         </button>
       </div>
 
@@ -493,7 +474,9 @@ function MissionView({
         <section className="flex flex-col gap-4">
           <div className="rounded-2xl border border-edge bg-panel p-5">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{m.icon}</span>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-phos/30 bg-phos/10 text-phos">
+                <Icon name={m.icon} size={24} />
+              </span>
               <div>
                 <h2 className="font-display text-xl font-bold">{t(m.title)}</h2>
                 <p className="font-mono text-xs text-muted">{m.band.label}</p>
@@ -554,8 +537,8 @@ function MissionView({
           </div>
           {m.objective.kind === "aircraft" && (
             <div className="rounded-2xl border border-edge bg-panel p-4">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-                ✈️ {t(STR.mission.aircraft)}
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted">
+                <Icon name="plane" size={14} /> {t(STR.mission.aircraft)}
               </h3>
               <AircraftTable list={frame?.aircraft ?? []} />
             </div>
@@ -588,66 +571,41 @@ function Stats({ frame }: { frame: Frame | null }) {
   );
 }
 
-/* ── Pro modal ───────────────────────────────────────────────────────────── */
+/* ── support modal — the whole tool is free, donations keep it alive ─────── */
 
-function UpgradeModal({ onClose, onActivated }: { onClose: () => void; onActivated: () => void }) {
+function SupportModal({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
-  const [key, setKey] = useState("");
-  const [err, setErr] = useState(false);
-  const tryActivate = () => {
-    if (activate(key)) onActivated();
-    else setErr(true);
-  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
         className="w-full max-w-md rounded-2xl border border-amber/40 bg-panel p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="font-display text-xl font-bold">
-          RF Academy <span className="text-amber">{t(STR.pro.title2)}</span>
-        </h2>
-        <ul className="mt-3 flex flex-col gap-2 text-sm text-slate-300">
-          <li>✈️ {t(STR.pro.f1)}</li>
-          <li>🚁 {t(STR.pro.f2)}</li>
-          <li>⏱️ {t(STR.pro.f3)}</li>
-          <li>❤️ {t(STR.pro.f4)}</li>
-        </ul>
+        <h2 className="font-display text-xl font-bold">{t(STR.support.title)}</h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">{t(STR.support.body1)}</p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">{t(STR.support.body2)}</p>
 
         <a
           href={DONATE_URL}
           target="_blank"
           rel="noreferrer"
-          className="mt-5 block rounded-lg bg-amber px-5 py-2.5 text-center text-sm font-bold text-ink transition-transform hover:scale-[1.02]"
+          className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-amber px-5 py-2.5 text-center text-sm font-bold text-ink transition-transform hover:scale-[1.02]"
         >
-          {t(STR.pro.getKey)}
+          <Icon name="coffee" size={16} /> {t(STR.support.donate)}
         </a>
-        <p className="mt-2 text-center text-xs text-muted">{t(STR.pro.getKeyHint)}</p>
-
-        <div className="mt-5 border-t border-edge/60 pt-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.pro.haveKey)}</div>
-          <div className="flex gap-2">
-            <input
-              value={key}
-              onChange={(e) => {
-                setKey(e.target.value);
-                setErr(false);
-              }}
-              placeholder={t(STR.pro.placeholder)}
-              className={`min-w-0 flex-1 rounded-lg border bg-ink px-3 py-2 font-mono text-sm outline-none ${
-                err ? "border-rose-500" : "border-edge focus:border-amber"
-              }`}
-            />
-            <button onClick={tryActivate} className="shrink-0 rounded-lg border border-amber/60 px-4 py-2 text-sm font-semibold text-amber hover:bg-amber/10">
-              {t(STR.pro.activate)}
-            </button>
-          </div>
-          {err && <p className="mt-1 text-xs text-rose-400">{t(STR.pro.invalid)}</p>}
-        </div>
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 block rounded-lg border border-edge px-5 py-2.5 text-center text-sm font-semibold text-slate-300 transition-colors hover:border-phos hover:text-phos"
+        >
+          {t(STR.support.star)}
+        </a>
+        <p className="mt-3 text-center font-mono text-[11px] text-muted">{t(STR.support.free)}</p>
 
         <div className="mt-4 text-center">
           <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
-            {t(STR.pro.later)}
+            {t(STR.support.later)}
           </button>
         </div>
       </div>

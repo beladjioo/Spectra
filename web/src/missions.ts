@@ -1,5 +1,6 @@
 import type { Frame } from "./lib/useRf";
 import type { LStr } from "./lib/i18n";
+import type { IconName } from "./components/Icon";
 
 export type Objective =
   | { kind: "observe" } // read the spectrum, then validate manually
@@ -11,12 +12,10 @@ export type Objective =
 
 export type Mission = {
   id: string;
-  icon: string;
+  icon: IconName;
   title: LStr;
   tagline: LStr;
   xp: number;
-  /** Premium mission — requires a Pro licence. */
-  pro?: boolean;
   band: { label: string; center_mhz: number; sample_rate_msps: number; gain_db: number };
   objective: Objective;
   goalText: LStr;
@@ -27,7 +26,7 @@ export type Mission = {
 export const MISSIONS: Mission[] = [
   {
     id: "first-contact",
-    icon: "📡",
+    icon: "radio",
     title: { fr: "Premier contact", en: "First contact" },
     tagline: {
       fr: "Lire un spectre, comprendre le bruit de fond",
@@ -57,7 +56,7 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "fm",
-    icon: "📻",
+    icon: "wave",
     title: { fr: "Capter une radio FM", en: "Catch an FM station" },
     tagline: {
       fr: "Trouver une station, voir un signal large bande",
@@ -87,7 +86,7 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "ism868",
-    icon: "📶",
+    icon: "burst",
     title: { fr: "Bande ISM 868 (capteurs / LoRa)", en: "ISM 868 band (sensors / LoRa)" },
     tagline: { fr: "Surprendre des bursts de l'IoT", en: "Catch IoT bursts in the act" },
     xp: 150,
@@ -114,7 +113,7 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "wifi24",
-    icon: "🌐",
+    icon: "wifi",
     title: { fr: "Le chaos du 2.4 GHz", en: "The 2.4 GHz chaos" },
     tagline: {
       fr: "WiFi, Bluetooth, micro-ondes : la cohue",
@@ -144,14 +143,13 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "adsb",
-    icon: "✈️",
+    icon: "plane",
     title: { fr: "Radar ADS-B", en: "ADS-B radar" },
     tagline: {
       fr: "Décoder les avions : indicatif, altitude, position",
       en: "Decode aircraft: callsign, altitude, position",
     },
     xp: 250,
-    pro: true,
     band: { label: "1090 MHz · Mode S", center_mhz: 1090, sample_rate_msps: 8, gain_db: 40 },
     objective: { kind: "aircraft" },
     goalText: {
@@ -175,14 +173,13 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: "drone",
-    icon: "🚁",
+    icon: "drone",
     title: { fr: "CAPSTONE — Détecter un drone", en: "CAPSTONE — Detect a drone" },
     tagline: {
       fr: "Repérer un lien vidéo OFDM large bande",
       en: "Spot a wideband OFDM video link",
     },
     xp: 300,
-    pro: true,
     band: { label: "2.44 GHz", center_mhz: 2440, sample_rate_msps: 20, gain_db: 40 },
     objective: { kind: "drone" },
     goalText: {

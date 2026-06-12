@@ -18,6 +18,7 @@ const FRAME_EVERY_MS = 125; // UI frame cadence (~8 fps, like the backend)
 type Source = {
   label: string;
   driver: string;
+  serial: string;
   fs: number;
   minHz: number;
   maxHz: number;
@@ -80,6 +81,7 @@ async function openRtl(dev: USBDevice): Promise<Source> {
   return {
     label: "RTL-SDR (WebUSB)",
     driver: "rtlsdr-webusb",
+    serial: dev.serialNumber || "",
     fs,
     minHz: 24e6,
     maxHz: 1766e6,
@@ -104,6 +106,7 @@ async function openHackRf(dev: USBDevice): Promise<Source> {
     h,
     label: "HackRF One (WebUSB)",
     driver: "hackrf-webusb",
+    serial: h.serial,
     fs: 0,
     minHz: 1e6,
     maxHz: 6000e6,
@@ -121,7 +124,9 @@ async function openHackRf(dev: USBDevice): Promise<Source> {
       return hz;
     },
     async read() {
-      return h.readSamples(FFT_N * 16);
+      // bigger blocks than the RTL path: the HackRF streams much faster, and
+      // fewer/larger bulk transfers keep the audio path gap-free
+      return h.readSamples(FFT_N * 64);
     },
     close: () => h.close(),
   };
@@ -190,7 +195,7 @@ async function streamLoop(src: Source) {
             state.actualHz,
             src.fs,
             state.gain ?? 62,
-            { present: true, driver: src.driver, label: src.label, serial: "" },
+            { present: true, driver: src.driver, label: src.label, serial: src.serial },
             state.audio?.demod.rate ?? 48000,
           );
           window.dispatchEvent(new CustomEvent("rfa-usb-frame", { detail: frame }));

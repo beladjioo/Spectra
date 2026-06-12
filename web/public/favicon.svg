@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="#05080d"/>
+  <!-- radiating phosphor arcs — a station emitting -->
+  <g fill="none" stroke="#4af2c8" stroke-width="3.2" stroke-linecap="round">
+    <path d="M24 40a12 12 0 0 1 16 0" opacity="0.55"/>
+    <path d="M19 45a19 19 0 0 1 26 0" opacity="0.3"/>
+  </g>
+  <!-- the "H" hertz core / antenna mast -->
+  <g stroke="#4af2c8" stroke-width="3.4" stroke-linecap="round">
+    <path d="M26 18v18M38 18v18M26 27h12"/>
+  </g>
+  <circle cx="32" cy="44" r="3" fill="#ffb454"/>
+</svg>
