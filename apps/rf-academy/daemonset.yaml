@@ -23,7 +23,7 @@ spec:
         spectra.io/hackrf: "true"
       containers:
         - name: rf-academy
-          image: ghcr.io/beladjioo/rf-academy:sha-d5c0571
+          image: ghcr.io/beladjioo/rf-academy:sha-3297a2d
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true # raw USB access to the HackRF
