@@ -4,12 +4,10 @@
 // journey, console, missions — works with zero origin server.
 // This is also the substrate for WebUSB: same pipeline, real samples later.
 
-import type { Frame, Peak, Aircraft } from "./useRf";
+import type { Frame, Aircraft } from "./useRf";
+import { extractFrame } from "./dsp";
 
 const N = 2048;
-const OUT_BINS = 256;
-const SNR_DB = 8;
-const WIDEBAND_MHZ = 5;
 
 // current tuning, updated by tune() (mirrors the backend's SDR thread state)
 const state = { centerHz: 98e6, fs: 8e6, gain: 32 };
@@ -88,72 +86,15 @@ function simAircraft(): Aircraft[] {
   });
 }
 
-/** Turn the synthetic spectrum into a Frame (port of dsp.rs::extract). */
+/** Turn the synthetic spectrum into a Frame (shared extractor in dsp.ts). */
 export function simFrame(): Frame {
   const { centerHz, fs, gain } = state;
-  const db = synth();
-  const n = db.length;
-  const binHz = fs / n;
-
-  const sorted = Float32Array.from(db).sort();
-  const noise = sorted[Math.floor(n / 5)];
-  const peakDb = sorted[n - 1];
-  const thr = noise + SNR_DB;
-
-  const peaks: Peak[] = [];
-  let occupied = 0;
-  let i = 0;
-  while (i < n) {
-    if (db[i] > thr) {
-      const start = i;
-      let pk = db[i];
-      while (i < n && db[i] > thr) {
-        pk = Math.max(pk, db[i]);
-        occupied++;
-        i++;
-      }
-      const w = i - start;
-      const bw = (w * binHz) / 1e6;
-      const mid = start + Math.floor(w / 2);
-      const off = (mid - n / 2) * binHz;
-      peaks.push({
-        center_mhz: (centerHz + off) / 1e6,
-        bandwidth_mhz: bw,
-        power_db: pk,
-        snr_db: pk - noise,
-        wideband: bw >= WIDEBAND_MHZ,
-      });
-    } else i++;
-  }
-  peaks.sort((a, b) => b.snr_db - a.snr_db);
-  peaks.length = Math.min(peaks.length, 12);
-
-  const step = Math.max(1, Math.floor(n / OUT_BINS));
-  const bins: number[] = [];
-  for (let k = 0; k < OUT_BINS; k++) {
-    const a = Math.min(k * step, n - 1);
-    const b = Math.min((k + 1) * step, n);
-    let m = -Infinity;
-    for (let j = a; j < Math.max(b, a + 1); j++) m = Math.max(m, db[j]);
-    bins.push(m);
-  }
-
-  const adsb = Math.abs(centerHz - 1090e6) < 2e6;
-  return {
-    center_mhz: centerHz / 1e6,
-    span_mhz: fs / 1e6,
-    sample_rate_msps: fs / 1e6,
-    gain_db: gain,
-    noise_floor_db: noise,
-    peak_db: peakDb,
-    occupancy: occupied / n,
-    peaks,
-    drone_suspected: peaks.some((p) => p.wideband),
-    bins,
-    sim: true,
-    sdr: { present: false, driver: "sim-web", label: "Simulateur (navigateur)", serial: "" },
-    audio_rate: 48000,
-    aircraft: adsb ? simAircraft() : [],
-    ts: Date.now() / 1000,
-  };
+  const frame = extractFrame(synth(), centerHz, fs, gain, {
+    present: false,
+    driver: "sim-web",
+    label: "Simulateur (navigateur)",
+    serial: "",
+  });
+  if (Math.abs(centerHz - 1090e6) < 2e6) frame.aircraft = simAircraft();
+  return frame;
 }

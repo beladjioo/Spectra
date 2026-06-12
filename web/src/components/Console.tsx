@@ -45,6 +45,7 @@ export default function Console({
 
   const stopAudio = () => {
     fetch("/api/audio?on=false", { method: "POST" }).catch(() => {});
+    import("../lib/webusb").then(({ usbSetAudio }) => usbSetAudio(false));
     const a = audioRef.current;
     if (a) {
       a.ws.close();
@@ -61,6 +62,12 @@ export default function Console({
   };
 
   const startAudio = () => {
+    // WebUSB SDR: the webusb module demodulates and plays the audio itself
+    if (frame?.sdr.driver === "rtlsdr-webusb") {
+      import("../lib/webusb").then(({ usbSetAudio }) => usbSetAudio(true));
+      setListening(true);
+      return;
+    }
     // browser-simulator mode (static deployment): local 440 Hz test tone,
     // no backend audio stream to subscribe to
     if (frame?.sdr.driver === "sim-web") {

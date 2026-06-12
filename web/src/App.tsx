@@ -312,10 +312,35 @@ function LangSwitch() {
   );
 }
 
-/* ── SDR banner (console view) ───────────────────────────────────────────── */
+/* ── SDR banner (console view): status + WebUSB connect ──────────────────── */
 
 function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | null }) {
   const { t } = useI18n();
+  const [usbOk, setUsbOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    import("./lib/webusb").then(({ usbSupported }) => setUsbOk(usbSupported()));
+  }, []);
+
+  const plug = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const { usbConnect } = await import("./lib/webusb");
+      await usbConnect();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const unplug = async () => {
+    const { usbDisconnect } = await import("./lib/webusb");
+    await usbDisconnect();
+  };
+
   if (!connected || !frame) {
     return (
       <div className="flex items-center gap-3 rounded-2xl border border-edge bg-panel p-4">
@@ -325,18 +350,29 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
     );
   }
   const s = frame.sdr;
+  const viaUsb = s.driver === "rtlsdr-webusb";
   if (s.present) {
     return (
-      <div className="flex items-center gap-4 rounded-2xl border border-phos/40 bg-phos/5 p-4">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-phos/40 bg-phos/5 p-4">
         <span className="text-2xl">📡</span>
         <div className="min-w-0 flex-1">
           <div className="font-display font-bold text-phos">
             {s.label || "SDR"} {t(STR.sdr.detected)}
           </div>
           <div className="truncate font-mono text-xs text-muted">
-            {s.serial ? `${t(STR.sdr.serial)} ${s.serial}` : t(STR.sdr.noSerial)} · {t(STR.sdr.driver)} {s.driver}
+            {viaUsb
+              ? t(STR.usb.active)
+              : `${s.serial ? `${t(STR.sdr.serial)} ${s.serial}` : t(STR.sdr.noSerial)} · ${t(STR.sdr.driver)} ${s.driver}`}
           </div>
         </div>
+        {viaUsb && (
+          <button
+            onClick={unplug}
+            className="shrink-0 rounded-lg border border-edge px-3 py-1.5 text-xs text-slate-300 hover:border-rose-500 hover:text-rose-400"
+          >
+            {t(STR.usb.disconnect)}
+          </button>
+        )}
         <span className="shrink-0 rounded-full border border-phos/40 px-3 py-1 text-xs font-semibold text-phos">
           {t(STR.sdr.liveBadge)}
         </span>
@@ -344,15 +380,31 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
     );
   }
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-amber/40 bg-amber/5 p-4">
-      <span className="text-2xl">🔌</span>
-      <div className="min-w-0 flex-1">
-        <div className="font-display font-bold text-amber">{t(STR.sdr.none)}</div>
-        <div className="text-xs text-muted">{t(STR.sdr.plugIn)}</div>
+    <div className="flex flex-col gap-3 rounded-2xl border border-amber/40 bg-amber/5 p-4">
+      <div className="flex items-center gap-4">
+        <span className="text-2xl">🔌</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-display font-bold text-amber">{t(STR.sdr.none)}</div>
+          <div className="text-xs text-muted">{usbOk ? t(STR.usb.hint) : t(STR.usb.unsupported)}</div>
+        </div>
+        <span className="shrink-0 rounded-full border border-amber/40 px-3 py-1 text-xs font-semibold text-amber">
+          {t(STR.sdr.simBadge)}
+        </span>
       </div>
-      <span className="shrink-0 rounded-full border border-amber/40 px-3 py-1 text-xs font-semibold text-amber">
-        {t(STR.sdr.simBadge)}
-      </span>
+      {usbOk && (
+        <button
+          onClick={plug}
+          disabled={busy}
+          className="self-start rounded-lg bg-phos px-4 py-2 text-sm font-bold text-ink transition-transform hover:scale-[1.02] disabled:opacity-50"
+        >
+          {busy ? "…" : t(STR.usb.connect)}
+        </button>
+      )}
+      {err && (
+        <p className="text-xs text-rose-400">
+          {t(STR.usb.error)} {err}
+        </p>
+      )}
     </div>
   );
 }

@@ -78,6 +78,24 @@ export const STR = {
     simBadge: { fr: "SIMULATEUR", en: "SIMULATOR" },
   },
 
+  usb: {
+    connect: { fr: "📡 Brancher mon RTL-SDR (USB)", en: "📡 Plug in my RTL-SDR (USB)" },
+    disconnect: { fr: "Déconnecter le SDR", en: "Disconnect the SDR" },
+    hint: {
+      fr: "Chrome/Edge uniquement. Branche une clé RTL-SDR (~30 €) et le navigateur la pilote directement — le traitement se fait sur ta machine, rien ne quitte ton ordinateur.",
+      en: "Chrome/Edge only. Plug in an RTL-SDR dongle (~$30) and the browser drives it directly — processing happens on your machine, nothing leaves your computer.",
+    },
+    active: {
+      fr: "RTL-SDR branché en direct — le spectre que tu vois est réel (24–1766 MHz).",
+      en: "RTL-SDR live — the spectrum you see is real (24–1766 MHz).",
+    },
+    error: { fr: "Connexion impossible :", en: "Could not connect:" },
+    unsupported: {
+      fr: "Ton navigateur ne gère pas WebUSB — utilise Chrome ou Edge pour brancher un SDR.",
+      en: "Your browser doesn't support WebUSB — use Chrome or Edge to plug in an SDR.",
+    },
+  },
+
   hero: {
     over: { fr: "EN CE MOMENT, AU-DESSUS DE TOI", en: "RIGHT NOW, ABOVE YOU" },
     title1: { fr: "L'air est plein de signaux.", en: "The air is full of signals." },
