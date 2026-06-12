@@ -1,6 +1,6 @@
 # Bienvenue dans la bibliothèque
 
-Ceci est la partie « livre » de RF Academy : une base de connaissances **interconnectée** sur le SDR et le HackRF, écrite pour aller du « c'est quoi une onde ? » jusqu'au « j'ai détecté un drone ». Les notes sont reliées entre elles (clique les liens `surlignés`) et **soudées aux missions** : à chaque concept, un bouton pour aller le voir **en direct**.
+Ceci est la partie « livre » d'OpenHertz : une base de connaissances **interconnectée** sur le SDR et le HackRF, écrite pour aller du « c'est quoi une onde ? » jusqu'au « j'ai détecté un drone ». Les notes sont reliées entre elles (clique les liens `surlignés`) et **soudées aux missions** : à chaque concept, un bouton pour aller le voir **en direct**.
 
 **Par où commencer ?**
 

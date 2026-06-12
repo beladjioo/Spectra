@@ -16,7 +16,7 @@ Une clé USB de la taille d'un briquet, dérivée des tuners TNT. La référence
 - Couverture **1 MHz à 6 GHz** : il voit le 2,4 GHz (WiFi, drones), invisible pour une RTL-SDR.
 - **Jusqu'à 20 MSps** : des fenêtres dix fois plus larges.
 - **Émission possible** (half-duplex) — donc interdite sans licence : voir [[legal-securite]]. L'académie reste en réception.
-- C'est le cœur de l'appliance Pi de RF Academy, et il marche aussi en WebUSB ici.
+- C'est le cœur de l'appliance Pi d'OpenHertz, et il marche aussi en WebUSB ici.
 
 | | RTL-SDR V3/V4 | HackRF One |
 |---|---|---|

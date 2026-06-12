@@ -16,7 +16,7 @@ A lighter-sized USB stick descended from DVB-T tuners. The reference: **RTL-SDR 
 - Coverage **1 MHz to 6 GHz**: it sees 2.4 GHz (WiFi, drones), invisible to an RTL-SDR.
 - **Up to 20 MSps**: windows ten times wider.
 - **Can transmit** (half-duplex) — which is illegal without a licence: see [[legal-securite]]. The academy stays receive-only.
-- It's the heart of RF Academy's Pi appliance, and it also works here over WebUSB.
+- It's the heart of OpenHertz's Pi appliance, and it also works here over WebUSB.
 
 | | RTL-SDR V3/V4 | HackRF One |
 |---|---|---|
