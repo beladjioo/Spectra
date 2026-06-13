@@ -58,6 +58,10 @@ export const SECTIONS: Section[] = [
     notes: ["workflow-live", "bandes-a-explorer", "decoder-vs-detecter", "legal-securite"],
   },
   {
+    title: { fr: "Missions guidées", en: "Guided missions" },
+    notes: ["airband", "pocsag", "satellites-meteo"],
+  },
+  {
     title: { fr: "Guerre électronique & drones", en: "Electronic warfare & drones" },
     notes: ["guerre-electronique", "drones-champ-bataille"],
   },

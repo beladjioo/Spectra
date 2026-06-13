@@ -85,6 +85,36 @@ export const MISSIONS: Mission[] = [
     ],
   },
   {
+    id: "airband",
+    icon: "tower",
+    title: { fr: "Écouter l'aviation (AM)", en: "Listen to aviation (AM)" },
+    tagline: {
+      fr: "Pilotes et tours de contrôle, en direct",
+      en: "Pilots and control towers, live",
+    },
+    xp: 120,
+    band: { label: "Airband · 124 MHz AM", center_mhz: 124.0, sample_rate_msps: 2, gain_db: 40 },
+    objective: { kind: "burst" },
+    goalText: {
+      fr: "Capture une transmission : un échange pilote ↔ tour de contrôle.",
+      en: "Catch a transmission: a pilot ↔ control-tower exchange.",
+    },
+    bible: [
+      {
+        fr: "La **bande aéronautique** (118–137 MHz) sert aux communications voix entre pilotes et contrôleurs. Contrairement à la FM, elle est en **AM** (modulation d'amplitude) — le même mode que la vieille radio « grandes ondes ».",
+        en: "The **airband** (118–137 MHz) carries voice between pilots and controllers. Unlike FM, it uses **AM** (amplitude modulation) — the same mode as old long-wave radio.",
+      },
+      {
+        fr: "Pourquoi l'AM ici ? En cas de transmissions qui se chevauchent, l'AM laisse entendre les deux (un battement caractéristique) plutôt que d'en effacer une — un choix de **sécurité**. Chaque canal ne fait que ~8 kHz de large : sur le spectre, une raie fine et brève.",
+        en: "Why AM here? When two transmissions overlap, AM lets you hear both (a tell-tale heterodyne) instead of capturing one and killing the other — a **safety** choice. Each channel is only ~8 kHz wide: on the spectrum, a thin, brief line.",
+      },
+      {
+        fr: "Le récepteur **démodule l'AM** par détection d'enveloppe : il suit l'amplitude de la porteuse, qui *est* la voix. Branche un vrai RTL-SDR avec une antenne dégagée et accorde une tour proche : tu entendras de vrais échanges. En simulateur, des transmissions synthétiques valident la mission.",
+        en: "The receiver **demodulates AM** by envelope detection: it follows the carrier's amplitude, which *is* the voice. Plug a real RTL-SDR with a clear antenna and tune a nearby tower: you'll hear real exchanges. In the simulator, synthetic transmissions validate the mission.",
+      },
+    ],
+  },
+  {
     id: "ism868",
     icon: "burst",
     title: { fr: "Bande ISM 868 (capteurs / LoRa)", en: "ISM 868 band (sensors / LoRa)" },
@@ -138,6 +168,36 @@ export const MISSIONS: Mission[] = [
       {
         fr: "Cette largeur de bande, c'est la clé de la mission suivante : un drone y cache son **lien vidéo**.",
         en: "That bandwidth is the key to the next mission: a drone hides its **video link** in here.",
+      },
+    ],
+  },
+  {
+    id: "pocsag",
+    icon: "bell",
+    title: { fr: "Bipeurs POCSAG", en: "POCSAG pagers" },
+    tagline: {
+      fr: "Le paging, une technologie toujours vivante",
+      en: "Paging — a legacy tech that's still alive",
+    },
+    xp: 150,
+    band: { label: "Paging · 466 MHz", center_mhz: 466.0, sample_rate_msps: 2, gain_db: 40 },
+    objective: { kind: "burst" },
+    goalText: {
+      fr: "Surprends un burst de paging : un bipeur qu'on appelle.",
+      en: "Catch a paging burst: a pager being called.",
+    },
+    bible: [
+      {
+        fr: "Les **bipeurs** (pagers) ne sont pas morts : hôpitaux, pompiers et secours s'appuient encore sur le **POCSAG**, un protocole des années 1980 d'une robustesse à toute épreuve. En Europe, on les trouve souvent vers **466 MHz**.",
+        en: "**Pagers** aren't dead: hospitals, firefighters and emergency services still rely on **POCSAG**, a rugged 1980s protocol. In Europe they often live around **466 MHz**.",
+      },
+      {
+        fr: "POCSAG est de la **FSK** : l'information saute entre deux fréquences proches. Sur le spectre, un burst étroit (~16 kHz) qui apparaît quand un message part, puis le silence. C'est l'inverse de la FM broadcast permanente.",
+        en: "POCSAG is **FSK**: the information hops between two close frequencies. On the spectrum, a narrow burst (~16 kHz) appears when a message is sent, then silence. The opposite of permanent broadcast FM.",
+      },
+      {
+        fr: "Cette mission **détecte la présence** d'un burst, elle ne décode pas le message — et c'est volontaire. Décoder POCSAG révélerait des données nominatives (médicales, opérationnelles) : l'**écouter** est une chose, l'**exploiter** en est une autre ([[legal-securite]]). On reste sur la détection, [[decoder-vs-detecter|honnête]].",
+        en: "This mission **detects the presence** of a burst; it does not decode the message — deliberately. Decoding POCSAG would reveal personal data (medical, operational): **listening** is one thing, **exploiting** is another ([[legal-securite]]). We stay at detection, [[decoder-vs-detecter|honestly]].",
       },
     ],
   },

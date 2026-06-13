@@ -50,6 +50,8 @@ export const STAGES: Stage[] = [
       { kind: "note", slug: "materiel-debuter" },
       { kind: "note", slug: "hackrf" },
       { kind: "mission", id: "fm" },
+      { kind: "note", slug: "airband" },
+      { kind: "mission", id: "airband" },
     ],
   },
   {
@@ -68,6 +70,8 @@ export const STAGES: Stage[] = [
       { kind: "note", slug: "antennes" },
       { kind: "note", slug: "reglage-antenne" },
       { kind: "mission", id: "ism868" },
+      { kind: "note", slug: "pocsag" },
+      { kind: "mission", id: "pocsag" },
       { kind: "mission", id: "wifi24" },
     ],
   },

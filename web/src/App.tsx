@@ -435,7 +435,9 @@ function SdrBanner({ connected, frame }: { connected: boolean; frame: Frame | nu
 const LEARN: Record<string, string> = {
   "first-contact": "ondes-radio",
   fm: "modulations",
+  airband: "airband",
   ism868: "bandes-a-explorer",
+  pocsag: "pocsag",
   wifi24: "modulations",
   adsb: "decoder-vs-detecter",
   drone: "decoder-vs-detecter",

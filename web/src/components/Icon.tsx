@@ -31,7 +31,9 @@ export type IconName =
   | "github"
   | "target"
   | "satellite"
-  | "wifi";
+  | "wifi"
+  | "tower"
+  | "bell";
 
 const P: Record<IconName, JSX.Element> = {
   compass: (
@@ -176,6 +178,19 @@ const P: Record<IconName, JSX.Element> = {
     </>
   ),
   wifi: <path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0M11 18.5a2 2 0 0 1 2 0M12 21h.01" />,
+  tower: (
+    <>
+      <path d="M12 3v18M9 21h6" />
+      <path d="M7.5 7a6 6 0 0 1 9 0M5.5 4.5a9 9 0 0 1 13 0" />
+      <path d="m10 11 2 4 2-4" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" />
+      <path d="M10.5 19a1.5 1.5 0 0 0 3 0" />
+    </>
+  ),
 };
 
 export default function Icon({

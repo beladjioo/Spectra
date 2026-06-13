@@ -39,16 +39,34 @@ function synth(): Float32Array {
 
   const mhz = centerHz / 1e6;
   const inWindow = (fMhz: number) => Math.abs(fMhz * 1e6 - centerHz) < fs / 2;
+  // Bursts that last a realistic ~1.8 s (so a mission's 1.2 s "hold" can
+  // validate) then fall silent — a duty cycle, not per-frame coin flips.
+  const bursting = (offsetMs: number, periodMs = 3000, onMs = 1800) =>
+    (Date.now() + offsetMs) % periodMs < onMs;
 
   if (mhz >= 87 && mhz < 109) {
     for (const st of [89.1, 96.9, 100.2, 106.1]) {
       if (inWindow(st)) addSignal(db, lo, binHz, st * 1e6, 180e3, -55 + Math.random() * 6);
     }
+  } else if (mhz >= 108 && mhz < 138) {
+    // airband AM: narrow (~8 kHz), short intermittent voice transmissions
+    [118.1, 121.5, 124.0, 127.8, 130.2].forEach((ch, i) => {
+      if (inWindow(ch) && bursting(i * 700)) {
+        addSignal(db, lo, binHz, ch * 1e6, 8e3, -57 - Math.random() * 8);
+      }
+    });
+  } else if (mhz >= 465 && mhz < 467) {
+    // POCSAG paging: ~16 kHz FSK bursts, grouped then silent
+    if (bursting(0, 3500, 1900)) {
+      const off = Math.sin(Date.now() / 1700) * fs * 0.3;
+      addSignal(db, lo, binHz, centerHz + off, 18e3, -56 - Math.random() * 6);
+    }
   } else if (mhz >= 1080 && mhz < 1100) {
     if (Math.random() < 0.6) addSignal(db, lo, binHz, 1090e6, 2e6, -60 - Math.random() * 8);
   } else if ((mhz >= 430 && mhz < 435) || (mhz >= 867 && mhz < 869)) {
-    if (Math.random() < 0.5) {
-      const off = (Math.random() - 0.5) * fs * 0.6;
+    // ISM bursts: a sensor wakes, transmits ~1.8 s, sleeps
+    if (bursting(0, 3200, 1800)) {
+      const off = Math.sin(Date.now() / 900) * fs * 0.3;
       addSignal(db, lo, binHz, centerHz + off, 125e3, -58 - Math.random() * 6);
     }
   } else if (mhz >= 2400 && mhz < 2484) {

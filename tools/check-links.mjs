@@ -5,7 +5,10 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 
-const MISSIONS = ["first-contact", "fm", "ism868", "wifi24", "adsb", "drone"];
+// derive mission ids from the source of truth so this can't drift
+const MISSIONS = [...readFileSync("web/src/missions.ts", "utf8").matchAll(/^\s{4}id: "([a-z0-9-]+)",/gm)].map(
+  (m) => m[1],
+);
 const DIRS = ["web/content/fr", "web/content/en"];
 const slugs = new Set(readdirSync("web/content/fr").map((f) => f.replace(".md", "")));
 

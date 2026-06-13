@@ -211,7 +211,74 @@ export function setDeemphasisUs(us: number) {
   deemphasisUs = us === 75 ? 75 : 50;
 }
 
-export class FmAudio {
+/** Common shape for the audio demodulators (FM broadcast, AM airband). */
+export interface Demod {
+  readonly rate: number;
+  process(iq: Uint8Array): Float32Array;
+}
+
+/** Which demodulator suits a band: airband (108–137 MHz) and HF are AM,
+ *  everything else here is treated as broadcast FM. */
+export function demodFor(centerMhz: number): "am" | "fm" {
+  return centerMhz >= 108 && centerMhz <= 137 ? "am" : "fm";
+}
+
+export function makeDemod(mode: "am" | "fm", fs: number): Demod {
+  return mode === "am" ? new AmAudio(fs) : new FmAudio(fs);
+}
+
+/** Envelope AM demodulator — the airband (aviation voice) is AM. Decimate to an
+ *  IF rate, take the magnitude (envelope), DC-block the carrier, decimate to
+ *  audio, and apply a slow AGC so quiet and loud transmissions sit level. */
+export class AmAudio implements Demod {
+  private d1: number;
+  private d2: number;
+  readonly rate: number;
+  private iqI = 0;
+  private iqQ = 0;
+  private iqCnt = 0;
+  private dcY = 0; // DC-block state (removes the carrier term)
+  private auAcc = 0;
+  private auCnt = 0;
+  private agc = 0.2; // running envelope level for automatic gain
+
+  constructor(fs: number) {
+    this.d1 = Math.max(1, Math.round(fs / FM_IF_RATE));
+    const ifRate = fs / this.d1;
+    this.d2 = Math.max(1, Math.round(ifRate / FM_AUDIO_TARGET));
+    this.rate = fs / (this.d1 * this.d2);
+  }
+
+  process(iq: Uint8Array): Float32Array {
+    const out: number[] = [];
+    for (let k = 0; k + 1 < iq.length; k += 2) {
+      this.iqI += (iq[k] - 127.5) / 127.5;
+      this.iqQ += (iq[k + 1] - 127.5) / 127.5;
+      if (++this.iqCnt < this.d1) continue;
+      const zi = this.iqI / this.d1;
+      const zq = this.iqQ / this.d1;
+      this.iqI = this.iqQ = 0;
+      this.iqCnt = 0;
+
+      const env = Math.sqrt(zi * zi + zq * zq); // envelope = |z|
+      this.dcY += 0.001 * (env - this.dcY); // track the DC/carrier level
+      const ac = env - this.dcY; // audio rides on top of the carrier
+
+      this.agc += 0.0005 * (Math.abs(ac) - this.agc);
+      const norm = ac / (this.agc * 4 + 1e-3);
+
+      this.auAcc += norm;
+      if (++this.auCnt >= this.d2) {
+        out.push(Math.max(-1, Math.min(1, this.auAcc / this.d2)));
+        this.auAcc = 0;
+        this.auCnt = 0;
+      }
+    }
+    return Float32Array.from(out);
+  }
+}
+
+export class FmAudio implements Demod {
   private d1: number;
   private d2: number;
   readonly rate: number;

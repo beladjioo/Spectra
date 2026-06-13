@@ -10,7 +10,7 @@
 // useRf.ts arbitrates: WebUSB > backend WebSocket > browser simulator.
 
 import type { Frame } from "./useRf";
-import { SpectrumAnalyzer, FmAudio, extractFrame, FFT_N } from "./dsp";
+import { SpectrumAnalyzer, makeDemod, demodFor, type Demod, extractFrame, FFT_N } from "./dsp";
 
 const FRAME_EVERY_MS = 125; // UI frame cadence (~8 fps, like the backend)
 
@@ -48,7 +48,7 @@ const state = {
   gain: null as number | null, // null = auto/defaults
   retune: false,
   audioOn: false,
-  audio: null as { ctx: AudioContext; next: number; demod: FmAudio; fs: number } | null,
+  audio: null as { ctx: AudioContext; next: number; demod: Demod; fs: number; mode: "am" | "fm" } | null,
   caps: null as UsbCaps | null,
   // when a mission asks for a band this device can't reach, the UI flips this
   // on: the loop keeps the device alive but stops publishing frames, so useRf
@@ -258,15 +258,17 @@ async function streamLoop(src: Source) {
   }
 }
 
-/** Demodulate and schedule FM audio straight from the IQ stream. */
+/** Demodulate and schedule audio straight from the IQ stream — AM for the
+ *  airband, FM otherwise (chosen from the tuned frequency). */
 function playFm(iq: Uint8Array, fs: number) {
-  if (state.audio && state.audio.fs !== fs) {
+  const mode = demodFor(state.actualHz / 1e6);
+  if (state.audio && (state.audio.fs !== fs || state.audio.mode !== mode)) {
     state.audio.ctx.close().catch(() => {});
     state.audio = null;
   }
   if (!state.audio) {
-    const demod = new FmAudio(fs);
-    state.audio = { ctx: new AudioContext(), next: 0, demod, fs };
+    const demod = makeDemod(mode, fs);
+    state.audio = { ctx: new AudioContext(), next: 0, demod, fs, mode };
   }
   const a = state.audio;
   const pcm = a.demod.process(iq);
