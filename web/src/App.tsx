@@ -16,6 +16,7 @@ import { FIRST_NOTE, titleOf } from "./lib/library";
 import { DONATE_URL, GITHUB_URL } from "./lib/links";
 import { useI18n, STR, fmt, type Locale } from "./lib/i18n";
 import { useRoute, navigate, type Route } from "./lib/router";
+import { track } from "./lib/analytics";
 import { markRead, readSlugs } from "./journey";
 import { MISSIONS, objectiveMet, missionInRange, needsWideband, levelFor, xpIntoLevel, type Mission } from "./missions";
 
@@ -67,11 +68,27 @@ export default function App() {
     if (view === "library") {
       markRead(note);
       setRead(readSlugs());
+      track("note_read", { m: note });
     }
   }, [view, note]);
   useEffect(() => {
-    if (active) tune(active.band.center_mhz, active.band.sample_rate_msps, active.band.gain_db);
+    if (active) {
+      tune(active.band.center_mhz, active.band.sample_rate_msps, active.band.gain_db);
+      track("mission_started", { m: active.id });
+    }
   }, [active]);
+
+  // one product page_view per navigation, and once-per-session sim/live signal
+  useEffect(() => {
+    track("page_view", { m: view });
+  }, [view, note, activeId]);
+  const sessionTagged = useRef(false);
+  useEffect(() => {
+    if (frame && !sessionTagged.current) {
+      sessionTagged.current = true;
+      track(frame.sim ? "sim_session" : "live_session", { s: frame.sdr.driver });
+    }
+  }, [frame]);
 
   // a stable, per-view document title (the pre-rendered pages ship the same)
   useEffect(() => {
@@ -105,6 +122,7 @@ export default function App() {
     if (progress.completed.includes(m.id)) return;
     setProgress((p) => ({ completed: [...p.completed, m.id], xp: p.xp + m.xp }));
     setToast(`+${m.xp} ${t(STR.toast.xp)} — ${t(m.title)} ✓`);
+    track("mission_completed", { m: m.id });
     setTimeout(() => setToast(null), 3200);
   };
 
@@ -168,7 +186,7 @@ export default function App() {
           {frame?.sim ? t(STR.status.sim) : connected ? t(STR.status.live) : t(STR.status.offline)}
         </span>
         <span>· {t(STR.support.free)} ·</span>
-        <a href={DONATE_URL} target="_blank" rel="noreferrer" className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
+        <a href={DONATE_URL} onClick={() => track("donate_click", { s: "footer" })} target="_blank" rel="noreferrer" className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
           {t(STR.donate.coffee)}
         </a>
         <button onClick={() => setShowBackup(true)} className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
@@ -684,6 +702,7 @@ function SupportModal({ onClose }: { onClose: () => void }) {
 
         <a
           href={DONATE_URL}
+          onClick={() => track("donate_click", { s: "modal" })}
           target="_blank"
           rel="noreferrer"
           className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-amber px-5 py-2.5 text-center text-sm font-bold text-ink transition-transform hover:scale-[1.02]"

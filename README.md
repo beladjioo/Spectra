@@ -108,9 +108,60 @@ spaced repetition, and a timed mock exam scored per domain — and a full
 
 ## Deployment
 
-The site is a Cloudflare static-assets Worker. Build with `npm run build` and
-deploy from `web/` with `npx wrangler deploy`. See `docs/GO-LIVE.md` for the
-homelab/Cloudflare architecture.
+The site is a Cloudflare Worker that serves the pre-rendered static build (the
+`ASSETS` binding) and collects product events at `POST /e`. Build with
+`npm run build` (which also pre-renders every route for SEO) and deploy from
+`web/` with `npx wrangler deploy`. The custom domain `openhertz.org` is wired in
+`web/wrangler.jsonc`. See `docs/GO-LIVE.md` for the homelab/Cloudflare
+architecture and `docs/DOMAIN.md` for the domain setup.
+
+## Analytics & observability
+
+Privacy-first — no cookies, no PII, no fingerprinting. Three dashboards:
+
+**1. Cloudflare Web Analytics** (visits, countries, referrers, Core Web Vitals).
+Easiest path: in the Cloudflare dashboard → *Web Analytics* → add `openhertz.org`;
+because the zone is proxied, the cookieless beacon is injected at the edge with
+zero code. (Alternatively set `VITE_CF_BEACON=<token>` at build time and the app
+injects the beacon itself — see `web/src/main.tsx`.)
+
+**2. Workers Logs** (requests, errors, `console` output). Enabled via
+`observability` in `web/wrangler.jsonc`. Read them in the dashboard under
+*Workers & Pages → rf-academy → Logs*, or stream live with `npx wrangler tail`.
+
+**3. Product events → Workers Analytics Engine.** The Worker (`web/worker/index.js`)
+writes named events to the `openhertz_events` dataset. The client fires them via
+`navigator.sendBeacon` (`web/src/lib/analytics.ts`): `page_view`,
+`mission_started` / `mission_completed` (mission id), `note_read` (slug),
+`sdr_connected` (rtl/hackrf), `sim_session` / `live_session`, `exam_started` /
+`exam_passed`, `donate_click`. Query with the Analytics Engine SQL API
+(`POST https://api.cloudflare.com/client/v4/accounts/<account_id>/analytics_engine/sql`,
+`Authorization: Bearer <API token with Account Analytics:Read>`). The schema:
+`blob1`=event, `blob2`=detail (mission/note/driver), `blob3`=locale, `blob4`=country,
+`blob5`=source.
+
+```sql
+-- where do learners drop off? funnel over the last 7 days
+SELECT blob1 AS event, count() AS n
+FROM openhertz_events
+WHERE timestamp > now() - INTERVAL '7' DAY
+GROUP BY event ORDER BY n DESC;
+```
+```sql
+-- what fraction of sessions ever connect real hardware?
+SELECT
+  countIf(blob1 = 'sdr_connected') AS connected,
+  countIf(blob1 = 'sim_session') AS sim_sessions
+FROM openhertz_events
+WHERE timestamp > now() - INTERVAL '30' DAY;
+```
+```sql
+-- which notes precede the most donate clicks (read engagement → support)
+SELECT blob2 AS note, count() AS reads
+FROM openhertz_events
+WHERE blob1 = 'note_read' AND timestamp > now() - INTERVAL '30' DAY
+GROUP BY note ORDER BY reads DESC LIMIT 15;
+```
 
 ## License
 

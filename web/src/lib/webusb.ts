@@ -197,6 +197,10 @@ export async function usbConnect(): Promise<void> {
       // RTL streams ~2.048 MSps; the HackRF path caps at 10 MSps (browser budget)
       maxMsps: src.driver.startsWith("rtlsdr") ? 2.4 : 10,
     };
+    // a real radio just got plugged in — the headline analytics question
+    void import("./analytics").then(({ track }) =>
+      track("sdr_connected", { s: src.driver.startsWith("rtlsdr") ? "rtl" : "hackrf" }),
+    );
     emitState();
     void streamLoop(src);
   } catch (e) {

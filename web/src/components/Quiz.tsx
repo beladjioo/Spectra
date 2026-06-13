@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 import { byCategory, shuffled, CATEGORY_LABEL, QUESTIONS, type Category, type Question } from "../quiz";
 import { useI18n, STR, fmt } from "../lib/i18n";
+import { track } from "../lib/analytics";
 import { EXAM_DONE_KEY } from "../journey";
 
 // ── Répétition espacée (Leitner) ─────────────────────────────────────────────
@@ -177,6 +178,10 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
   });
   const [, tick] = useState(0);
 
+  useEffect(() => {
+    track("exam_started");
+  }, []);
+
   // horloge
   useEffect(() => {
     if (exam.finished) return;
@@ -200,7 +205,10 @@ function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string)
     const reg = score("reglementation");
     const tec = score("technique");
     const passed = reg.pass && tec.pass;
-    if (passed) localStorage.setItem(EXAM_DONE_KEY, "1"); // journey checkpoint
+    if (passed && localStorage.getItem(EXAM_DONE_KEY) !== "1") {
+      localStorage.setItem(EXAM_DONE_KEY, "1"); // journey checkpoint (fire once)
+      track("exam_passed");
+    }
     const wrong = exam.questions.filter((q) => exam.answers[q.id] !== q.answer);
     return (
       <>

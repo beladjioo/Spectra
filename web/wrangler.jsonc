@@ -1,26 +1,28 @@
-// Cloudflare Workers config: serve the built app as a static-assets Worker.
-// Deploy manually from `web/` with `npx wrangler deploy` (wrangler is OAuth-
-// logged-in on the maintainer's machine).
+// Cloudflare Worker config: an edge Worker that serves the pre-rendered static
+// site (ASSETS binding) and collects privacy-first product events at POST /e
+// into a Workers Analytics Engine dataset. Deploy manually from `web/` with
+// `npx wrangler deploy` (wrangler is OAuth-logged-in on the maintainer's
+// machine).
 //
-// NOTE on naming: the Worker is still named `rf-academy` so the existing
-// workers.dev URL (https://rf-academy.spectra-rf.workers.dev) and the new
-// custom domain both serve the *same* latest deployment — one Worker, two
-// hostnames, no duplicate to keep in sync. The public brand is **OpenHertz**;
-// production is openhertz.org (registered via Cloudflare Registrar, 2026-06-12).
+// Naming: the Worker is still named `rf-academy` so the existing workers.dev
+// URL and the openhertz.org custom domain both serve the same deployment.
 {
   "name": "rf-academy",
   "account_id": "f1204316f97e4c90b760662c4b54828f",
   "compatibility_date": "2026-06-01",
-  // keep the workers.dev URL live too — declaring custom routes disables it by
-  // default, but rf-academy.spectra-rf.workers.dev is a known/tested fallback.
+  "main": "worker/index.js",
   "workers_dev": true,
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+  // product events (mission_started/completed, sdr_connected, note_read, …)
+  "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "openhertz_events" }],
+  // Workers Logs: requests/errors visible in the Cloudflare dashboard
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
 
-  // Cloudflare provisions and renews TLS automatically, and the static-assets
-  // pipeline is edge-cached out of the box. Both apex and www point here.
+  // Production custom domain — both apex and www point at this Worker.
   "routes": [
     { "pattern": "openhertz.org", "custom_domain": true },
     { "pattern": "www.openhertz.org", "custom_domain": true }
