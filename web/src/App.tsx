@@ -7,6 +7,7 @@ import Quiz from "./components/Quiz";
 import Journey from "./components/Journey";
 import AircraftTable from "./components/Aircraft";
 import Icon from "./components/Icon";
+import Onboarding, { onboarded } from "./components/Onboarding";
 
 // Leaflet is heavy — only visitors who open the map pay for it
 const MapView = lazy(() => import("./components/MapView"));
@@ -41,7 +42,11 @@ export default function App() {
   const activeId = route.view === "mission" ? route.id : null;
   const [toast, setToast] = useState<string | null>(null);
   const [showSupport, setShowSupport] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const [read, setRead] = useState<Set<string>>(readSlugs);
+  // first-visit chooser — only when actually landing on the journey, so a
+  // shared deep link (/mission/…, /library/…) isn't covered by it
+  const [showOnboard, setShowOnboard] = useState(() => !onboarded() && route.view === "home");
 
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(progress));
@@ -166,9 +171,21 @@ export default function App() {
         <a href={DONATE_URL} target="_blank" rel="noreferrer" className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
           {t(STR.donate.coffee)}
         </a>
+        <button onClick={() => setShowBackup(true)} className="text-slate-500 underline-offset-2 hover:text-phos hover:underline">
+          {t(STR.backup.link)}
+        </button>
       </footer>
 
+      {showOnboard && (
+        <Onboarding
+          onConsole={() => setView("console")}
+          onNote={openNote}
+          onClose={() => setShowOnboard(false)}
+        />
+      )}
+
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+      {showBackup && <BackupModal onClose={() => setShowBackup(false)} />}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-pulse rounded-full border border-phos bg-phos/15 px-5 py-2.5 font-display text-sm font-bold text-phos shadow-lg">
@@ -686,6 +703,69 @@ function SupportModal({ onClose }: { onClose: () => void }) {
         <div className="mt-4 text-center">
           <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
             {t(STR.support.later)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── progress backup (local-first, no accounts) ──────────────────────────── */
+
+function BackupModal({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const doImport = async (file: File) => {
+    try {
+      const { importProgress } = await import("./lib/progress");
+      const n = importProgress(await file.text());
+      setMsg({ ok: true, text: fmt(t(STR.backup.done), { n }) });
+      // reflect restored progress without a manual refresh
+      setTimeout(() => window.location.assign("/"), 1200);
+    } catch {
+      setMsg({ ok: false, text: t(STR.backup.bad) });
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-edge bg-panel p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-display text-xl font-bold">{t(STR.backup.title)}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">{t(STR.backup.intro)}</p>
+
+        <button
+          onClick={() => import("./lib/progress").then(({ downloadProgress }) => downloadProgress())}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-phos px-5 py-2.5 text-sm font-bold text-ink transition-transform hover:scale-[1.02]"
+        >
+          <Icon name="check" size={16} /> {t(STR.backup.download)}
+        </button>
+
+        <div className="mt-5 border-t border-edge/60 pt-4">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.backup.importTitle)}</div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) doImport(f);
+            }}
+          />
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="w-full rounded-lg border border-edge px-5 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:border-phos hover:text-phos"
+          >
+            {t(STR.backup.choose)}
+          </button>
+          {msg && <p className={`mt-2 text-xs ${msg.ok ? "text-phos" : "text-rose-400"}`}>{msg.text}</p>}
+        </div>
+
+        <div className="mt-4 text-center">
+          <button onClick={onClose} className="text-sm text-muted hover:text-slate-300">
+            {t(STR.backup.close)}
           </button>
         </div>
       </div>

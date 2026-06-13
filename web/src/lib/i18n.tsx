@@ -113,7 +113,7 @@ export const STR = {
     serial: { fr: "n° de série", en: "serial" },
     noSerial: { fr: "n° de série indisponible", en: "serial unavailable" },
     driver: { fr: "pilote", en: "driver" },
-    none: { fr: "Aucun SDR détecté", en: "No SDR detected" },
+    none: { fr: "Tu écoutes le simulateur", en: "You're on the simulator" },
     plugIn: {
       fr: "Branche un RTL-SDR (~30 €) ou un HackRF en USB — détection automatique. En attendant, tout fonctionne en simulateur.",
       en: "Plug in an RTL-SDR (~$30) or a HackRF over USB — detected automatically. Meanwhile, everything runs on the simulator.",
@@ -126,8 +126,8 @@ export const STR = {
     connect: { fr: "Brancher mon SDR (USB)", en: "Plug in my SDR (USB)" },
     disconnect: { fr: "Déconnecter le SDR", en: "Disconnect the SDR" },
     hint: {
-      fr: "Chrome/Edge uniquement. Branche une clé RTL-SDR (~30 €) ou un HackRF et le navigateur le pilote directement — le traitement se fait sur ta machine, rien ne quitte ton ordinateur.",
-      en: "Chrome/Edge only. Plug in an RTL-SDR dongle (~$30) or a HackRF and the browser drives it directly — processing happens on your machine, nothing leaves your computer.",
+      fr: "Spectre synthétique en direct — tout fonctionne. Tu as une clé RTL-SDR (~30 €) ou un HackRF ? Branche-la (Chrome/Edge) : le navigateur la pilote, le traitement reste sur ta machine.",
+      en: "Live synthetic spectrum — everything works. Got an RTL-SDR (~$30) or a HackRF? Plug it in (Chrome/Edge): the browser drives it, processing stays on your machine.",
     },
     active: {
       fr: "SDR branché en direct — le spectre que tu vois est réel.",
@@ -358,6 +358,46 @@ export const STR = {
   donate: {
     support: { fr: "Soutenir", en: "Support" },
     coffee: { fr: "Offrir un café", en: "Buy me a coffee" },
+  },
+
+  backup: {
+    link: { fr: "Sauvegarder ma progression", en: "Save my progress" },
+    title: { fr: "Sauvegarder & restaurer", en: "Save & restore" },
+    intro: {
+      fr: "Ta progression (XP, missions, notes lues, révisions) vit dans ce navigateur. Aucun compte : sauvegarde-la dans un fichier pour la garder ou la transférer sur un autre appareil.",
+      en: "Your progress (XP, missions, read notes, revision) lives in this browser. No account: save it to a file to keep it or move it to another device.",
+    },
+    download: { fr: "Télécharger ma sauvegarde", en: "Download my backup" },
+    importTitle: { fr: "Restaurer depuis un fichier", en: "Restore from a file" },
+    choose: { fr: "Choisir un fichier…", en: "Choose a file…" },
+    done: { fr: "Progression restaurée ✓ — {n} éléments.", en: "Progress restored ✓ — {n} items." },
+    bad: { fr: "Fichier non reconnu.", en: "Unrecognised file." },
+    close: { fr: "Fermer", en: "Close" },
+  },
+
+  onboard: {
+    title: { fr: "Bienvenue sur OpenHertz", en: "Welcome to OpenHertz" },
+    sub: {
+      fr: "Apprends la radio en l'écoutant pour de vrai. Comment veux-tu commencer ?",
+      en: "Learn radio by actually listening to it. How do you want to start?",
+    },
+    haveSdr: { fr: "J'ai un RTL-SDR ou un HackRF", en: "I have an RTL-SDR or HackRF" },
+    haveSdrSub: {
+      fr: "Branche-le dans le navigateur (Chrome/Edge) et pilote-le en direct — tout le traitement reste sur ta machine.",
+      en: "Plug it into the browser (Chrome/Edge) and drive it live — all processing stays on your machine.",
+    },
+    haveNothing: { fr: "Je n'ai pas de matériel", en: "I have no hardware" },
+    haveNothingSub: {
+      fr: "Aucun souci : tu tournes déjà sur le simulateur. Spectre synthétique en direct, toutes les missions fonctionnent. Branche un vrai SDR quand tu veux.",
+      en: "No problem: you're already running on the simulator. Live synthetic spectrum, every mission works. Plug in real hardware anytime.",
+    },
+    whatIsThis: { fr: "C'est quoi, au juste ?", en: "What is this, exactly?" },
+    whatIsThisSub: {
+      fr: "Une plateforme libre et gratuite pour apprendre le SDR, mission par mission. Lis l'intro.",
+      en: "A free, open platform to learn SDR, mission by mission. Read the intro.",
+    },
+    startJourney: { fr: "Commencer le voyage", en: "Start the journey" },
+    skip: { fr: "passer", en: "skip" },
   },
 
   toast: {
