@@ -10,8 +10,11 @@ export type LStr = { fr: string; en: string };
 const STORAGE = "rfa-locale";
 
 function initialLocale(): Locale {
-  // a shared link carries its language — that beats any local preference
+  // a shared link carries its language — that beats any local preference,
+  // whether as a /en|/fr path prefix (prerendered pages) or ?lang=
   try {
+    const seg = window.location.pathname.split("/").filter(Boolean)[0];
+    if (seg === "fr" || seg === "en") return seg;
     const fromUrl = new URLSearchParams(window.location.search).get("lang");
     if (fromUrl === "fr" || fromUrl === "en") return fromUrl;
   } catch {

@@ -18,6 +18,9 @@ export type Route =
 
 export function parse(pathname: string): Route {
   const seg = pathname.replace(/\/+$/, "").split("/").filter(Boolean);
+  // a leading /en or /fr is a locale prefix (prerendered SEO entry points);
+  // strip it — the locale itself is resolved by i18n
+  if (seg[0] === "en" || seg[0] === "fr") seg.shift();
   switch (seg[0]) {
     case undefined:
       return { view: "home" };

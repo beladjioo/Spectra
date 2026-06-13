@@ -101,6 +101,23 @@ body::after {
   background: rgba(74, 242, 200, 0.25);
 }
 
+/* respect the OS "reduce motion" setting: kill the scanlines sweep, pulses,
+   XP-bar transitions and page-load reveals for people who ask for calm */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .rise {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* slim scrollbars that match the instrument theme */
 * {
   scrollbar-width: thin;
