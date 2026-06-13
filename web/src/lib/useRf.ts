@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { UsbCaps } from "./webusb";
 
 export type Peak = {
   center_mhz: number;
@@ -117,6 +118,31 @@ export function useRf() {
   }, []);
 
   return { connected, frame };
+}
+
+/** Live capabilities of the plugged-in WebUSB radio, or null when none is
+ *  connected. Lets the UI tell the truth about a device's frequency/rate
+ *  limits instead of silently clamping. */
+export function useUsbCaps(): UsbCaps | null {
+  const [caps, setCaps] = useState<UsbCaps | null>(null);
+  useEffect(() => {
+    // seed from current module state (a device may already be connected)
+    import("./webusb").then(({ usbCaps }) => setCaps(usbCaps()));
+    const onState = (e: Event) => {
+      const d = (e as CustomEvent<{ caps?: UsbCaps | null }>).detail;
+      setCaps(d.caps ?? null);
+    };
+    window.addEventListener("rfa-usb", onState);
+    return () => window.removeEventListener("rfa-usb", onState);
+  }, []);
+  return caps;
+}
+
+/** Route a mission to the simulator when the connected device can't reach its
+ *  band (so the objective can still validate), without a silent clamp. */
+export async function preferSim(on: boolean) {
+  const { usbActive, usbBypass } = await import("./webusb");
+  if (usbActive() || on) usbBypass(on);
 }
 
 /** Retune the radio (each mission tunes to its band). Drives whichever

@@ -10,13 +10,13 @@ import Icon from "./components/Icon";
 
 // Leaflet is heavy — only visitors who open the map pay for it
 const MapView = lazy(() => import("./components/MapView"));
-import { useRf, tune, type Frame } from "./lib/useRf";
+import { useRf, useUsbCaps, preferSim, tune, type Frame } from "./lib/useRf";
 import { FIRST_NOTE, titleOf } from "./lib/library";
 import { DONATE_URL, GITHUB_URL } from "./lib/links";
-import { useI18n, STR, type Locale } from "./lib/i18n";
+import { useI18n, STR, fmt, type Locale } from "./lib/i18n";
 import { useRoute, navigate, type Route } from "./lib/router";
 import { markRead, readSlugs } from "./journey";
-import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
+import { MISSIONS, objectiveMet, missionInRange, needsWideband, levelFor, xpIntoLevel, type Mission } from "./missions";
 
 const KEY = "rf-academy-progress";
 type Progress = { completed: string[]; xp: number };
@@ -33,6 +33,7 @@ type View = Route["view"];
 export default function App() {
   const { t, locale } = useI18n();
   const { connected, frame } = useRf();
+  const caps = useUsbCaps();
   const [progress, setProgress] = useState<Progress>(loadProgress);
   const route = useRoute();
   const view = route.view;
@@ -118,6 +119,7 @@ export default function App() {
           frame={frame}
           read={read}
           completed={progress.completed}
+          caps={caps}
           nav={{
             onMission: openMissionById,
             onNote: openNote,
@@ -461,6 +463,16 @@ function MissionView({
   const heldRef = useRef<number | null>(null);
   const [justWon, setJustWon] = useState(false);
 
+  // hardware truthfulness: if the plugged-in device can't reach this band,
+  // route the mission to the simulator (tuned to the real band) and say so,
+  // instead of silently clamping to the device's ceiling
+  const caps = useUsbCaps();
+  const outOfRange = !missionInRange(m, caps);
+  useEffect(() => {
+    preferSim(outOfRange);
+    return () => void preferSim(false);
+  }, [outOfRange]);
+
   // auto-validate when the objective holds ~1.2s (except "observe" = manual)
   useEffect(() => {
     if (done || justWon || m.objective.kind === "observe") return;
@@ -511,6 +523,18 @@ function MissionView({
                 <p className="font-mono text-xs text-muted">{m.band.label}</p>
               </div>
             </div>
+            {outOfRange && caps && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber/40 bg-amber/5 p-3 text-xs leading-relaxed text-amber">
+                <Icon name="plug" size={14} className="mt-0.5 shrink-0" />
+                <span>
+                  {fmt(t(STR.mission.outOfRange), {
+                    device: caps.label.replace(" (WebUSB)", ""),
+                    max: Math.round(caps.maxMhz),
+                    band: m.band.center_mhz,
+                  })}
+                </span>
+              </div>
+            )}
             <div className="prose-radio mt-4 flex flex-col gap-3 text-[15px] leading-[1.75] text-slate-300">
               {m.bible.map((p, i) => (
                 <p key={i} dangerouslySetInnerHTML={{ __html: mdBold(t(p)) }} />

@@ -190,7 +190,26 @@ export function extractFrame(
 const FM_IF_RATE = 240e3;
 const FM_AUDIO_TARGET = 48e3;
 const FM_DEVIATION_HZ = 75e3;
-const DEEMPHASIS_S = 50e-6;
+
+// FM de-emphasis time constant. 50 µs is the European/world standard; the
+// Americas, Korea and Taiwan use 75 µs. Defaults by the browser's region and
+// is overridable from the console settings.
+const DEEMPHASIS_75_REGIONS = new Set(["US", "CA", "MX", "KR", "TW", "BR", "AR", "CL", "CO", "PE", "VE"]);
+function defaultDeemphasisUs(): number {
+  try {
+    const region =
+      (navigator.language.split("-")[1] || "").toUpperCase() ||
+      new Intl.DateTimeFormat().resolvedOptions().timeZone.split("/")[0];
+    return DEEMPHASIS_75_REGIONS.has(region) ? 75 : 50;
+  } catch {
+    return 50;
+  }
+}
+let deemphasisUs = defaultDeemphasisUs();
+export const getDeemphasisUs = () => deemphasisUs;
+export function setDeemphasisUs(us: number) {
+  deemphasisUs = us === 75 ? 75 : 50;
+}
 
 export class FmAudio {
   private d1: number;
@@ -212,7 +231,7 @@ export class FmAudio {
     const ifRate = fs / this.d1;
     this.d2 = Math.max(1, Math.round(ifRate / FM_AUDIO_TARGET));
     this.rate = fs / (this.d1 * this.d2);
-    this.deemphA = 1 - Math.exp(-1 / ifRate / DEEMPHASIS_S);
+    this.deemphA = 1 - Math.exp(-1 / ifRate / (deemphasisUs * 1e-6));
     this.gain = ifRate / (2 * Math.PI * FM_DEVIATION_HZ);
   }
 

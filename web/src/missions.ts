@@ -225,3 +225,20 @@ export function objectiveMet(m: Mission, f: Frame | null): boolean {
 
 export const levelFor = (xp: number) => Math.floor(xp / 250) + 1;
 export const xpIntoLevel = (xp: number) => xp % 250;
+
+/** RTL-SDR (the recommended ~30 € entry device) ceiling — anything above needs
+ *  a wideband SDR like the HackRF. */
+export const RTL_MAX_MHZ = 1766;
+
+type Caps = { minMhz: number; maxMhz: number } | null;
+
+/** Can the connected device physically reach this mission's band? With no
+ *  device (caps null) the simulator covers everything, so always true. */
+export function missionInRange(m: Mission, caps: Caps): boolean {
+  if (!caps) return true;
+  return m.band.center_mhz >= caps.minMhz && m.band.center_mhz <= caps.maxMhz;
+}
+
+/** Missions that sit above the RTL-SDR ceiling — flagged "HackRF" in the UI so
+ *  an RTL owner knows before clicking. */
+export const needsWideband = (m: Mission) => m.band.center_mhz > RTL_MAX_MHZ;

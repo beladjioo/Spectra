@@ -4,6 +4,7 @@ import Waterfall from "./Waterfall";
 import AircraftTable from "./Aircraft";
 import Icon from "./Icon";
 import { tune, type Frame } from "../lib/useRf";
+import { getDeemphasisUs, setDeemphasisUs } from "../lib/dsp";
 import { useI18n, STR, fmt, type LStr } from "../lib/i18n";
 
 type Preset = { label: LStr; hint: LStr; mhz: number; sr: number; gain: number; note?: string };
@@ -247,6 +248,8 @@ export default function Console({
           <p className="mt-2 text-xs text-muted">{t(STR.console.gainHint)}</p>
         </section>
 
+        <DeemphasisSetting />
+
         <section className="rounded-2xl border border-edge bg-panel p-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.console.understand)}</h3>
           <div className="flex flex-wrap gap-2 text-sm">
@@ -335,6 +338,35 @@ function StationFinder({
           {t(STR.console.antennaGuide)}
         </button>
       </p>
+    </section>
+  );
+}
+
+/** FM de-emphasis: 50 µs world / 75 µs Americas+Korea. Defaults by region. */
+function DeemphasisSetting() {
+  const { t } = useI18n();
+  const [us, setUs] = useState(getDeemphasisUs());
+  const pick = (v: number) => {
+    setDeemphasisUs(v);
+    setUs(v);
+  };
+  return (
+    <section className="rounded-2xl border border-edge bg-panel p-4">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{t(STR.console.deemphasis)}</h3>
+      <div className="flex gap-2">
+        {[50, 75].map((v) => (
+          <button
+            key={v}
+            onClick={() => pick(v)}
+            className={`flex-1 rounded-lg px-2 py-2 text-sm font-semibold ${
+              us === v ? "bg-phos text-ink" : "border border-edge bg-ink hover:border-phos"
+            }`}
+          >
+            {v} µs
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted">{t(STR.console.deemphasisHint)}</p>
     </section>
   );
 }

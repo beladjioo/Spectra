@@ -195,6 +195,11 @@ export const STR = {
     occ: { fr: "occ", en: "occ" },
     share: { fr: "Partager ce moment", en: "Share this moment" },
     copied: { fr: "Lien copié — colle-le où tu veux !", en: "Link copied — paste it anywhere!" },
+    hwBadge: { fr: "HackRF requis", en: "HackRF required" },
+    outOfRange: {
+      fr: "Ton {device} plafonne à {max} MHz : cette mission ({band} MHz) tourne en simulateur. Un HackRF (1 MHz–6 GHz) la ferait en vrai.",
+      en: "Your {device} tops out at {max} MHz: this mission ({band} MHz) runs in simulator mode. A HackRF (1 MHz–6 GHz) would do it for real.",
+    },
   },
 
   console: {
@@ -241,6 +246,15 @@ export const STR = {
     helpGain: { fr: "le gain", en: "gain" },
     helpMod: { fr: "les modulations", en: "modulations" },
     helpBands: { fr: "quoi écouter", en: "what to listen to" },
+    deemphasis: { fr: "Dé-emphase FM", en: "FM de-emphasis" },
+    deemphasisHint: {
+      fr: "50 µs : Europe et monde · 75 µs : Amériques, Corée. Mauvais réglage = son trop sourd ou trop sifflant.",
+      en: "50 µs: Europe & most of the world · 75 µs: Americas, Korea. Wrong setting = muffled or hissy audio.",
+    },
+    outOfRangeNote: {
+      fr: "Hors de portée de ton {device} (max {max} MHz) — affichage en simulateur.",
+      en: "Beyond your {device}'s reach (max {max} MHz) — showing the simulator.",
+    },
   },
 
   presets: {

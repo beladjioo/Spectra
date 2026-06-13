@@ -1,8 +1,10 @@
 import Spectrum from "./Spectrum";
 import Icon, { type IconName } from "./Icon";
 import type { Frame } from "../lib/useRf";
+import type { UsbCaps } from "../lib/webusb";
 import { useI18n, STR } from "../lib/i18n";
 import { STAGES, stageProgress, stageUnlocked, stepDone, missionById, type Stage, type Step } from "../journey";
+import { missionInRange } from "../missions";
 import { titleOf } from "../lib/library";
 
 type Nav = {
@@ -17,11 +19,13 @@ export default function Journey({
   frame,
   read,
   completed,
+  caps,
   nav,
 }: {
   frame: Frame | null;
   read: Set<string>;
   completed: string[];
+  caps: UsbCaps | null;
   nav: Nav;
 }) {
   const { t } = useI18n();
@@ -117,6 +121,7 @@ export default function Journey({
               progress={stageProgress(stage, read, completed)}
               read={read}
               completed={completed}
+              caps={caps}
               onStep={go}
             />
           ))}
@@ -144,6 +149,7 @@ function StageRow({
   progress,
   read,
   completed,
+  caps,
   onStep,
 }: {
   index: number;
@@ -152,6 +158,7 @@ function StageRow({
   progress: number;
   read: Set<string>;
   completed: string[];
+  caps: UsbCaps | null;
   onStep: (s: Step) => void;
 }) {
   const { t, locale } = useI18n();
@@ -215,6 +222,7 @@ function StageRow({
                 step={step}
                 done={stepDone(step, read, completed)}
                 disabled={!unlocked}
+                caps={caps}
                 locale={locale}
                 onClick={() => unlocked && onStep(step)}
               />
@@ -235,24 +243,30 @@ function StepChip({
   step,
   done,
   disabled,
+  caps,
   locale,
   onClick,
 }: {
   step: Step;
   done: boolean;
   disabled: boolean;
+  caps: UsbCaps | null;
   locale: "fr" | "en";
   onClick: () => void;
 }) {
   const { t } = useI18n();
   let icon: IconName = "book";
   let label = "";
+  let needsHackrf = false;
   if (step.kind === "note") {
     label = titleOf(step.slug, locale);
   } else if (step.kind === "mission") {
     const m = missionById(step.id);
     icon = "target";
     label = m ? t(m.title) : step.id;
+    // only flag when a real device is plugged in that can't reach the band —
+    // on the simulator everything works, so no scary badge
+    needsHackrf = !!m && !!caps && !missionInRange(m, caps);
   } else {
     icon = "cap";
     label = t(STR.quiz.exam);
@@ -270,6 +284,11 @@ function StepChip({
     >
       <Icon name={done ? "check" : icon} size={12} />
       <span className="max-w-[24ch] truncate">{label}</span>
+      {needsHackrf && (
+        <span className="ml-0.5 rounded-full border border-amber/50 bg-amber/10 px-1.5 text-[9px] font-bold uppercase text-amber">
+          HackRF
+        </span>
+      )}
     </button>
   );
 }

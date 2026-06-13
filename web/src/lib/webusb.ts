@@ -29,6 +29,16 @@ type Source = {
   close(): Promise<void>;
 };
 
+/** What the connected device can physically do — surfaced so missions can tell
+ *  the truth instead of silently clamping out-of-range bands. */
+export type UsbCaps = {
+  driver: string;
+  label: string;
+  minMhz: number;
+  maxMhz: number;
+  maxMsps: number;
+};
+
 const state = {
   src: null as Source | null,
   running: false,
@@ -39,15 +49,34 @@ const state = {
   retune: false,
   audioOn: false,
   audio: null as { ctx: AudioContext; next: number; demod: FmAudio; fs: number } | null,
+  caps: null as UsbCaps | null,
+  // when a mission asks for a band this device can't reach, the UI flips this
+  // on: the loop keeps the device alive but stops publishing frames, so useRf
+  // falls back to the simulator (tuned to the real band) — no silent clamp.
+  bypass: false,
 };
 
 export const usbSupported = () =>
   typeof navigator !== "undefined" && !!(navigator as Navigator & { usb?: unknown }).usb;
 
 export const usbActive = () => state.running;
+export const usbCaps = () => state.caps;
+
+/** Route a mission to the simulator instead of the (out-of-range) device. */
+export function usbBypass(on: boolean) {
+  if (state.bypass === on) return;
+  state.bypass = on;
+  emitState();
+}
 
 function emitState(error?: string) {
-  window.dispatchEvent(new CustomEvent("rfa-usb", { detail: { active: state.running, error } }));
+  window.dispatchEvent(
+    new CustomEvent("rfa-usb", {
+      // "active" is what useRf keys off: a bypassed device must read as inactive
+      // so the simulator takes over for the unreachable band
+      detail: { active: state.running && !state.bypass, error, caps: state.caps },
+    }),
+  );
 }
 
 /** Queue a retune; the streaming loop applies it between reads. */
@@ -159,6 +188,15 @@ export async function usbConnect(): Promise<void> {
     );
     state.src = src;
     state.running = true;
+    state.bypass = false;
+    state.caps = {
+      driver: src.driver,
+      label: src.label,
+      minMhz: src.minHz / 1e6,
+      maxMhz: src.maxHz / 1e6,
+      // RTL streams ~2.048 MSps; the HackRF path caps at 10 MSps (browser budget)
+      maxMsps: src.driver.startsWith("rtlsdr") ? 2.4 : 10,
+    };
     emitState();
     void streamLoop(src);
   } catch (e) {
@@ -189,7 +227,7 @@ async function streamLoop(src: Source) {
       if (now - lastFrame >= FRAME_EVERY_MS) {
         lastFrame = now;
         const db = analyzer.renderDb();
-        if (db) {
+        if (db && !state.bypass) {
           const frame: Frame = extractFrame(
             db,
             state.actualHz,
@@ -207,6 +245,8 @@ async function streamLoop(src: Source) {
     emitState(e instanceof Error ? e.message : String(e));
   } finally {
     state.running = false;
+    state.bypass = false;
+    state.caps = null;
     usbSetAudio(false);
     try {
       await src.close();
