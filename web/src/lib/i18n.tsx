@@ -10,6 +10,13 @@ export type LStr = { fr: string; en: string };
 const STORAGE = "rfa-locale";
 
 function initialLocale(): Locale {
+  // a shared link carries its language — that beats any local preference
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("lang");
+    if (fromUrl === "fr" || fromUrl === "en") return fromUrl;
+  } catch {
+    /* ignore */
+  }
   try {
     const saved = localStorage.getItem(STORAGE);
     if (saved === "fr" || saved === "en") return saved;
@@ -33,6 +40,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
     document.documentElement.lang = locale;
+    // keep the URL shareable in the reader's language
+    import("./router").then(({ setUrlLang }) => setUrlLang(locale));
   }, [locale]);
   const value = useMemo(() => ({ locale, setLocale }), [locale]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -184,6 +193,8 @@ export const STR = {
     noise: { fr: "bruit", en: "noise" },
     peak: { fr: "pic", en: "peak" },
     occ: { fr: "occ", en: "occ" },
+    share: { fr: "Partager ce moment", en: "Share this moment" },
+    copied: { fr: "Lien copié — colle-le où tu veux !", en: "Link copied — paste it anywhere!" },
   },
 
   console: {

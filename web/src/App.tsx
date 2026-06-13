@@ -11,9 +11,10 @@ import Icon from "./components/Icon";
 // Leaflet is heavy — only visitors who open the map pay for it
 const MapView = lazy(() => import("./components/MapView"));
 import { useRf, tune, type Frame } from "./lib/useRf";
-import { FIRST_NOTE } from "./lib/library";
+import { FIRST_NOTE, titleOf } from "./lib/library";
 import { DONATE_URL, GITHUB_URL } from "./lib/links";
 import { useI18n, STR, type Locale } from "./lib/i18n";
+import { useRoute, navigate, type Route } from "./lib/router";
 import { markRead, readSlugs } from "./journey";
 import { MISSIONS, objectiveMet, levelFor, xpIntoLevel, type Mission } from "./missions";
 
@@ -27,15 +28,16 @@ const loadProgress = (): Progress => {
   }
 };
 
-type View = "home" | "mission" | "library" | "console" | "exam" | "map";
+type View = Route["view"];
 
 export default function App() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { connected, frame } = useRf();
   const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [view, setView] = useState<View>("home");
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [note, setNote] = useState<string>(FIRST_NOTE);
+  const route = useRoute();
+  const view = route.view;
+  const note = route.view === "library" && route.slug ? route.slug : FIRST_NOTE;
+  const activeId = route.view === "mission" ? route.id : null;
   const [toast, setToast] = useState<string | null>(null);
   const [showSupport, setShowSupport] = useState(false);
   const [read, setRead] = useState<Set<string>>(readSlugs);
@@ -53,21 +55,45 @@ export default function App() {
 
   const active = useMemo(() => MISSIONS.find((m) => m.id === activeId) ?? null, [activeId]);
 
-  const openMission = (m: Mission) => {
-    setActiveId(m.id);
-    setView("mission");
-    tune(m.band.center_mhz, m.band.sample_rate_msps, m.band.gain_db);
-  };
-  const openNote = (slug: string) => {
-    setNote(slug);
-    setView("library");
-    markRead(slug);
-    setRead(readSlugs());
-  };
+  // deep links must behave like clicks: visiting a note marks it read,
+  // entering a mission tunes the radio
+  useEffect(() => {
+    if (view === "library") {
+      markRead(note);
+      setRead(readSlugs());
+    }
+  }, [view, note]);
+  useEffect(() => {
+    if (active) tune(active.band.center_mhz, active.band.sample_rate_msps, active.band.gain_db);
+  }, [active]);
+
+  // a stable, per-view document title (the pre-rendered pages ship the same)
+  useEffect(() => {
+    const base = "OpenHertz";
+    document.title =
+      view === "library"
+        ? `${titleOf(note, locale)} — ${base}`
+        : view === "mission"
+          ? `${active ? t(active.title) : base} — ${base}`
+          : view === "home"
+            ? `${base} — ${t(STR.tagline)}`
+            : `${t(STR.nav[view === "console" ? "explore" : view === "map" ? "map" : "exam"])} — ${base}`;
+  }, [view, note, active, locale]); // eslint-disable-line
+
+  const openMission = (m: Mission) => navigate({ view: "mission", id: m.id });
+  const openNote = (slug: string) => navigate({ view: "library", slug });
   const openMissionById = (id: string) => {
-    const m = MISSIONS.find((x) => x.id === id);
-    if (m) openMission(m);
+    if (MISSIONS.some((x) => x.id === id)) navigate({ view: "mission", id });
   };
+  const setView = (v: View) => {
+    if (v === "library") navigate({ view: "library", slug: note });
+    else if (v !== "mission") navigate({ view: v });
+  };
+
+  // an unknown mission id in the URL falls back to the journey
+  useEffect(() => {
+    if (view === "mission" && !active) navigate({ view: "home" }, { replace: true });
+  }, [view, active]);
 
   const complete = (m: Mission) => {
     if (progress.completed.includes(m.id)) return;
@@ -507,6 +533,7 @@ function MissionView({
                   <span className="font-display font-bold text-phos">
                     ✓ {t(STR.mission.validated)} · +{m.xp} XP
                   </span>
+                  <ShareButton />
                   <button onClick={onNext} className="ml-auto rounded-lg bg-phos px-4 py-2 text-sm font-semibold text-ink">
                     {t(STR.mission.next)}
                   </button>
@@ -553,6 +580,30 @@ function MissionView({
         </section>
       </div>
     </div>
+  );
+}
+
+/** "I just decoded my first aircraft" deserves a URL that reproduces it. */
+function ShareButton() {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* clipboard blocked — the URL bar still works */
+    }
+  };
+  return (
+    <button
+      onClick={copy}
+      className="flex items-center gap-1.5 rounded-lg border border-phos/40 px-3 py-2 text-xs font-semibold text-phos transition-colors hover:bg-phos/10"
+    >
+      <Icon name={copied ? "check" : "burst"} size={13} />
+      {copied ? t(STR.mission.copied) : t(STR.mission.share)}
+    </button>
   );
 }
 
