@@ -70,9 +70,11 @@ function synth(): Float32Array {
       addSignal(db, lo, binHz, centerHz + off, 125e3, -58 - Math.random() * 6);
     }
   } else if (mhz >= 2400 && mhz < 2484) {
-    addSignal(db, lo, binHz, centerHz + (Math.random() - 0.5) * fs * 0.5, 1e6, -68);
-    if (Math.random() < 0.35) {
-      const off = (Math.random() - 0.5) * fs * 0.3;
+    // narrow WiFi/BT chatter (keeps occupancy up) + a wideband video link that
+    // comes and goes like a real drone — held long enough to be recognised
+    addSignal(db, lo, binHz, centerHz + Math.sin(Date.now() / 700) * fs * 0.4, 1e6, -66);
+    if (bursting(0, 3600, 2000)) {
+      const off = Math.sin(Date.now() / 1500) * fs * 0.25;
       addSignal(db, lo, binHz, centerHz + off, 9e6, -52 + Math.random() * 4);
     }
   }
