@@ -24,7 +24,8 @@ const headTags = [...builtIndex.matchAll(/<(script|link)\b[^>]*?>(?:<\/script>)?
   .join("\n    ");
 
 /* ── content ──────────────────────────────────────────────────────────────── */
-const LOCALES = ["fr", "en"];
+// English is the base locale (served at the root); French lives under /fr.
+const LOCALES = ["en", "fr"];
 const slugs = readdirSync("content/fr").map((f) => f.replace(/\.md$/, ""));
 const note = (slug, loc) => {
   try {
@@ -51,7 +52,7 @@ function preprocess(md, base) {
   return md
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, slug, label) => {
       const s = slug.trim();
-      return `[${label || titleOf(note(s, "fr"))}](${base}/library/${s})`;
+      return `[${label || titleOf(note(s, "en"))}](${base}/library/${s})`;
     })
     .replace(/\(#note:([a-z0-9-]+)\)/g, (_, s) => `(${base}/library/${s})`)
     .replace(/\(#mission:([a-z0-9-]+)\)/g, (_, id) => `(${base}/mission/${id})`);
@@ -96,8 +97,9 @@ const STR = {
 
 /* ── HTML assembly ────────────────────────────────────────────────────────── */
 function buildPage({ loc, path, title, description, body, jsonld }) {
-  const canon = loc === "fr" ? `${SITE}${path}` : `${SITE}/en${path}`;
-  const alt = (l) => (l === "fr" ? `${SITE}${path}` : `${SITE}/en${path}`);
+  const canon = loc === "en" ? `${SITE}${path}` : `${SITE}/fr${path}`;
+  const alt = (l) => (l === "en" ? `${SITE}${path}` : `${SITE}/fr${path}`);
+  const ogLocale = (l) => (l === "fr" ? "fr_FR" : "en_US");
   const t = `${title} — OpenHertz`;
   return `<!doctype html>
 <html lang="${loc}">
@@ -107,10 +109,12 @@ function buildPage({ loc, path, title, description, body, jsonld }) {
     <title>${esc(t)}</title>
     <meta name="description" content="${esc(description)}" />
     <link rel="canonical" href="${canon}" />
-    <link rel="alternate" hreflang="fr" href="${alt("fr")}" />
     <link rel="alternate" hreflang="en" href="${alt("en")}" />
-    <link rel="alternate" hreflang="x-default" href="${alt("fr")}" />
+    <link rel="alternate" hreflang="fr" href="${alt("fr")}" />
+    <link rel="alternate" hreflang="x-default" href="${alt("en")}" />
     <meta property="og:site_name" content="OpenHertz" />
+    <meta property="og:locale" content="${ogLocale(loc)}" />
+    <meta property="og:locale:alternate" content="${ogLocale(loc === "fr" ? "en" : "fr")}" />
     <meta property="og:title" content="${esc(t)}" />
     <meta property="og:description" content="${esc(description)}" />
     <meta property="og:type" content="website" />
@@ -141,9 +145,9 @@ function write(routePath, html) {
 /* ── emit every route × locale ────────────────────────────────────────────── */
 const urls = new Set();
 for (const loc of LOCALES) {
-  const base = loc === "fr" ? "" : "/en";
+  const base = loc === "en" ? "" : "/fr";
   const out = (p, html) => {
-    const rp = loc === "fr" ? p : `/en${p === "/" ? "" : p}`;
+    const rp = loc === "en" ? p : `/fr${p === "/" ? "" : p}`;
     write(rp, html);
     urls.add(rp === "" ? "/" : rp);
   };

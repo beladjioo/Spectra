@@ -1,9 +1,11 @@
 // OpenHertz edge Worker: serves the pre-rendered static site (via the ASSETS
-// binding) and collects privacy-first product events at POST /e, writing them
-// to a Workers Analytics Engine dataset. No cookies, no PII, no fingerprinting
-// — just an event name, a couple of low-cardinality dimensions, and the coarse
-// country Cloudflare already knows. Static assets are served directly without
-// invoking this Worker; only /e and SPA-fallback paths reach here.
+// binding), exposes the visitor's coarse country at GET /geo (so the app can
+// default France to French while English stays the base everywhere else), and
+// collects privacy-first product events at POST /e, writing them to a Workers
+// Analytics Engine dataset. No cookies, no PII, no fingerprinting — just an
+// event name, a couple of low-cardinality dimensions, and the coarse country
+// Cloudflare already knows. Static assets are served directly without invoking
+// this Worker; only /geo, /e and SPA-fallback paths reach here.
 
 // Events we accept (anything else is dropped — no open firehose).
 const EVENTS = new Set([
@@ -24,6 +26,19 @@ const clean = (s, max = 48) => (typeof s === "string" ? s.slice(0, max).replace(
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // Coarse geolocation for first-visit language defaulting. No storage, no
+    // logging — the app reads only { country } and forgets it.
+    if (url.pathname === "/geo") {
+      const country = (request.cf && request.cf.country) || "XX";
+      return new Response(JSON.stringify({ country }), {
+        headers: {
+          "content-type": "application/json",
+          "cache-control": "no-store",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
 
     if (url.pathname === "/e") {
       if (request.method !== "POST") return new Response("method not allowed", { status: 405 });

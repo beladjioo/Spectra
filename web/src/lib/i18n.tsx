@@ -1,17 +1,20 @@
 /* Bilingual core. Every piece of UI copy lives here as { fr, en }; structured
    content (missions, quiz, journey, notes) carries its own LStr fields and is
-   resolved with the same t(). Locale persists and follows the browser on first
-   visit. */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+   resolved with the same t(). English is the base language; on a first visit
+   with no explicit choice, visitors located in France default to French and
+   everyone else stays on English (geo-detected via the edge Worker's /geo).
+   The choice is always overridable, and persists / travels in the URL. */
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type Locale = "fr" | "en";
 export type LStr = { fr: string; en: string };
 
 const STORAGE = "rfa-locale";
 
-function initialLocale(): Locale {
-  // a shared link carries its language — that beats any local preference,
-  // whether as a /en|/fr path prefix (prerendered pages) or ?lang=
+/** A locale the visitor already carries explicitly: a shared link's /fr|/en path
+ *  prefix or ?lang=, or a previously saved choice. `null` means "no preference
+ *  yet" — that's the only case where we fall back to geo. */
+function explicitLocale(): Locale | null {
   try {
     const seg = window.location.pathname.split("/").filter(Boolean)[0];
     if (seg === "fr" || seg === "en") return seg;
@@ -26,27 +29,56 @@ function initialLocale(): Locale {
   } catch {
     /* ignore */
   }
-  return navigator.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
+  return null;
 }
 
 const Ctx = createContext<{ locale: Locale; setLocale: (l: Locale) => void }>({
-  locale: "fr",
+  locale: "en",
   setLocale: () => {},
 });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>(initialLocale);
-  useEffect(() => {
+  // Start on English (the base) — or whatever explicit choice the visitor
+  // already carries. A France geo-guess may upgrade to French in the effect
+  // below, before the user touches anything.
+  const [locale, setLocaleState] = useState<Locale>(() => explicitLocale() ?? "en");
+
+  // Only an explicit choice (the language toggle) is persisted.
+  const setLocale = useCallback((l: Locale) => {
+    setLocaleState(l);
     try {
-      localStorage.setItem(STORAGE, locale);
+      localStorage.setItem(STORAGE, l);
     } catch {
       /* ignore */
     }
+  }, []);
+
+  // First visit, no preference yet: ask the edge where the request came from.
+  // France → French; everywhere else stays on the English base. Not persisted,
+  // so it remains a soft default until the visitor actually picks a language.
+  useEffect(() => {
+    if (explicitLocale() !== null) return;
+    let cancelled = false;
+    fetch("/geo")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d && d.country === "FR") setLocaleState("fr");
+      })
+      .catch(() => {
+        /* offline / local dev — the English base is fine */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Reflect the active locale in <html lang> and keep the URL shareable.
+  useEffect(() => {
     document.documentElement.lang = locale;
-    // keep the URL shareable in the reader's language
     import("./router").then(({ setUrlLang }) => setUrlLang(locale));
   }, [locale]);
-  const value = useMemo(() => ({ locale, setLocale }), [locale]);
+
+  const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
