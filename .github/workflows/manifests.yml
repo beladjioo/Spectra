@@ -1,0 +1,27 @@
+name: validate-manifests
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.yaml"
+      - "**/*.yml"
+  pull_request:
+    paths:
+      - "**/*.yaml"
+      - "**/*.yml"
+permissions:
+  contents: read
+jobs:
+  kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Render every kustomization
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            echo "Rendering $file"
+            kubectl kustomize "$(dirname "$file")" >/dev/null
+          done < <(find . -name kustomization.yaml -not -path './.git/*' -print)
