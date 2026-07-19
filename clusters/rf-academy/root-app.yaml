@@ -13,12 +13,10 @@ spec:
   source:
     repoURL: https://github.com/beladjioo/Spectra.git
     targetRevision: main
-    path: clusters/rf-academy/apps
-    directory:
-      recurse: false
+    path: apps/rf-academy
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: rf-academy
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     syncOptions: [CreateNamespace=true]
