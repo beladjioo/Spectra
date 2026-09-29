@@ -11,7 +11,12 @@ le texte officiel. Le contenu reste **hors du dépôt public**.
 
 ## 2. Polar (utilisateur — création de compte)
 
-1. Compte vendeur sur polar.sh, organisation « OpenHertz ».
+1. Compte vendeur sur polar.sh, organisation « OpenHertz », **au nom de
+   l'entreprise individuelle québécoise** (décision du 2026-09-29) : pays
+   Canada, versements Stripe Connect Express sur le compte bancaire canadien de
+   l'EI. Le Canada figure dans les pays pris en charge par Polar. Polar reste
+   vendeur officiel face à l'acheteur (TVA/TPS collectées et reversées par
+   lui) ; l'EI déclare les versements reçus comme revenu d'entreprise.
 2. Produit « Prépa examen radioamateur », **paiement unique** (prix proposé :
    19 €), avec un avantage **License Keys** (sans limite d'activation ni
    d'expiration).

@@ -30,7 +30,9 @@ l'affiliation (zéro stock) reste envisageable.
 
 - **Encaissement : Polar** (merchant of record — il collecte et reverse la TVA),
   produit à achat unique avec avantage « clé de licence ». Le compte vendeur est
-  créé **par l'utilisateur**, jamais par un agent.
+  **au nom de l'entreprise individuelle québécoise** (décision du 2026-09-29 —
+  la même EI que canada-inc, versements sur son compte canadien) et il est créé
+  **par l'utilisateur**, jamais par un agent.
 - **Le dépôt est public** : la banque payante n'y entre **jamais**. Elle vit dans
   `~/Desktop/openhertz-prep/` (ignoré par Git) et dans le KV Cloudflare `PREP`
   (clé `bank:v1`). Le Worker (`web/worker/index.js`, `/api/prep/*`) vérifie la clé
