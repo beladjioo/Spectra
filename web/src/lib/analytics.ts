@@ -14,6 +14,8 @@ export type EventName =
   | "exam_started"
   | "exam_passed"
   | "donate_click"
+  | "prep_checkout_click"
+  | "prep_unlocked"
   | "page_view";
 
 type Detail = { m?: string; s?: string };

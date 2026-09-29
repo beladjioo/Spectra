@@ -30,6 +30,8 @@ jobs:
           fi
       - name: check content links
         run: node tools/check-links.mjs
+      - name: test paid-prep Worker endpoints
+        run: node --test web/worker/prep.test.mjs
       - if: steps.gate.outputs.ready == '1'
         uses: actions/setup-node@v4
         with:

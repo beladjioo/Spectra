@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
-import { byCategory, shuffled, CATEGORY_LABEL, QUESTIONS, type Category, type Question } from "../quiz";
+import { shuffled, CATEGORY_LABEL, QUESTIONS, type Category, type Question } from "../quiz";
+import { usePrep } from "../lib/prep";
 import { useI18n, STR, fmt } from "../lib/i18n";
 import { track } from "../lib/analytics";
 import { EXAM_DONE_KEY } from "../journey";
@@ -23,6 +24,9 @@ const loadSrs = (): SrsState => {
 // ── Examen blanc ─────────────────────────────────────────────────────────────
 const EXAM_MINUTES = 30;
 const PASS_RATIO = 0.5; // ≥ la moitié dans chaque domaine, comme à l'ANFR
+// Questions tirées par domaine : avec la prépa complète, chaque examen blanc
+// est un tirage différent dans une banque plus large.
+const EXAM_PER_CATEGORY = 20;
 
 type ExamState = {
   questions: Question[];
@@ -39,17 +43,19 @@ const choiceOrder = (q: Question) => shuffled(q.choices.map((_, i) => i));
 
 export default function Quiz({ onLearn }: { onLearn: (slug: string) => void }) {
   const [mode, setMode] = useState<"menu" | "train" | "exam">("menu");
+  const prep = usePrep();
+  const bank = useMemo(() => [...QUESTIONS, ...prep.paid], [prep.paid]);
 
   return (
     <div className="flex flex-col gap-4">
-      {mode === "menu" && <Menu onTrain={() => setMode("train")} onExam={() => setMode("exam")} />}
-      {mode === "train" && <Train onBack={() => setMode("menu")} onLearn={onLearn} />}
-      {mode === "exam" && <Exam onBack={() => setMode("menu")} onLearn={onLearn} />}
+      {mode === "menu" && <Menu bank={bank} prep={prep} onTrain={() => setMode("train")} onExam={() => setMode("exam")} />}
+      {mode === "train" && <Train bank={bank} onBack={() => setMode("menu")} onLearn={onLearn} />}
+      {mode === "exam" && <Exam bank={bank} onBack={() => setMode("menu")} onLearn={onLearn} />}
     </div>
   );
 }
 
-function srsStats() {
+function srsStats(QUESTIONS: Question[]) {
   const srs = loadSrs();
   let acquired = 0,
     learning = 0;
@@ -62,16 +68,30 @@ function srsStats() {
   return { acquired, learning, fresh: QUESTIONS.length - acquired - learning };
 }
 
-function Menu({ onTrain, onExam }: { onTrain: () => void; onExam: () => void }) {
+function Menu({
+  bank,
+  prep,
+  onTrain,
+  onExam,
+}: {
+  bank: Question[];
+  prep: ReturnType<typeof usePrep>;
+  onTrain: () => void;
+  onExam: () => void;
+}) {
   const { t } = useI18n();
-  const stats = useMemo(srsStats, []);
+  const stats = useMemo(() => srsStats(bank), [bank]);
+  const examSize = (["reglementation", "technique"] as Category[]).reduce(
+    (n, c) => n + Math.min(EXAM_PER_CATEGORY, bank.filter((q) => q.cat === c).length),
+    0,
+  );
   return (
     <>
       <div className="rise rounded-2xl border border-edge bg-panel p-5">
         <h2 className="flex items-center gap-2 font-display text-lg font-bold">
           <Icon name="cap" size={20} className="text-phos" /> {t(STR.quiz.title)}
         </h2>
-        <p className="mt-1 text-sm text-muted">{fmt(t(STR.quiz.intro), { n: QUESTIONS.length })}</p>
+        <p className="mt-1 text-sm text-muted">{fmt(t(STR.quiz.intro), { n: bank.length })}</p>
         <p className="mt-2 font-mono text-xs text-muted">
           <b className="text-phos">{stats.acquired}</b> {t(STR.quiz.acquired)} ·{" "}
           <b className="text-amber">{stats.learning}</b> {t(STR.quiz.learning)} ·{" "}
@@ -98,17 +118,90 @@ function Menu({ onTrain, onExam }: { onTrain: () => void; onExam: () => void }) 
           <Icon name="trophy" size={26} className="text-amber" />
           <h3 className="mt-2 font-display font-bold">{t(STR.quiz.exam)}</h3>
           <p className="mt-1 text-sm text-muted">
-            {fmt(t(STR.quiz.examSub), { n: QUESTIONS.length, m: EXAM_MINUTES })}
+            {fmt(t(STR.quiz.examSub), { n: examSize, m: EXAM_MINUTES })}
           </p>
         </button>
       </div>
+      <PrepCard prep={prep} />
     </>
+  );
+}
+
+// ── Prépa complète (payante) ─────────────────────────────────────────────────
+
+function PrepCard({ prep }: { prep: ReturnType<typeof usePrep> }) {
+  const { t } = useI18n();
+  const [key, setKey] = useState("");
+  if (prep.unlocked)
+    return (
+      <p className="rounded-xl border border-phos/40 bg-phos/5 px-4 py-3 text-sm text-phos">
+        ✓ {fmt(t(STR.quiz.prepUnlocked), { n: prep.paid.length })}
+      </p>
+    );
+  if (!prep.config?.enabled || !prep.config.checkoutUrl) return null;
+  const submit = async () => {
+    if (key.trim() && (await prep.unlock(key))) track("prep_unlocked");
+  };
+  return (
+    <div className="rise rounded-2xl border border-amber/40 bg-panel p-5" style={{ animationDelay: "200ms" }}>
+      <h3 className="flex items-center gap-2 font-display font-bold">
+        <Icon name="cap" size={20} className="text-amber" /> {t(STR.quiz.prepTitle)}
+        {prep.config.price && <span className="font-mono text-sm text-amber">· {prep.config.price}</span>}
+      </h3>
+      <p className="mt-1 text-sm text-muted">{fmt(t(STR.quiz.prepPitch), { n: QUESTIONS.length })}</p>
+      <a
+        href={prep.config.checkoutUrl}
+        target="_blank"
+        rel="noopener"
+        onClick={() => track("prep_checkout_click")}
+        className="mt-3 inline-block rounded-lg bg-amber px-5 py-2 text-sm font-semibold text-ink"
+      >
+        {t(STR.quiz.prepBuy)}
+      </a>
+      <p className="mt-4 text-xs text-muted">{t(STR.quiz.prepHaveKey)}</p>
+      <form
+        className="mt-1 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <input
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={t(STR.quiz.prepKeyPlaceholder)}
+          autoComplete="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 rounded-lg border border-edge bg-ink px-3 py-2 font-mono text-sm"
+        />
+        <button
+          disabled={prep.status === "busy"}
+          className="rounded-lg border border-amber px-4 py-2 text-sm font-semibold text-amber disabled:opacity-50"
+        >
+          {t(STR.quiz.prepUnlock)}
+        </button>
+      </form>
+      {prep.error && (
+        <p className="mt-2 text-xs text-rose-400">
+          {t(prep.error === "invalid-key" ? STR.quiz.prepBadKey : STR.quiz.prepDown)}
+        </p>
+      )}
+      <p className="mt-3 text-[11px] text-slate-600">{t(STR.quiz.prepFree)}</p>
+    </div>
   );
 }
 
 // ── Mode révision ────────────────────────────────────────────────────────────
 
-function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string) => void }) {
+function Train({
+  bank: QUESTIONS,
+  onBack,
+  onLearn,
+}: {
+  bank: Question[];
+  onBack: () => void;
+  onLearn: (slug: string) => void;
+}) {
   const { t } = useI18n();
   const [queue, setQueue] = useState<Question[]>(() => {
     const srs = loadSrs();
@@ -164,10 +257,19 @@ function Train({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string
 
 // ── Examen blanc ─────────────────────────────────────────────────────────────
 
-function Exam({ onBack, onLearn }: { onBack: () => void; onLearn: (slug: string) => void }) {
+function Exam({
+  bank,
+  onBack,
+  onLearn,
+}: {
+  bank: Question[];
+  onBack: () => void;
+  onLearn: (slug: string) => void;
+}) {
   const { t } = useI18n();
   const [exam, setExam] = useState<ExamState>(() => {
-    const questions = [...shuffled(byCategory("reglementation")), ...shuffled(byCategory("technique"))];
+    const draw = (cat: Category) => shuffled(bank.filter((q) => q.cat === cat)).slice(0, EXAM_PER_CATEGORY);
+    const questions = [...draw("reglementation"), ...draw("technique")];
     return {
       questions,
       order: Object.fromEntries(questions.map((q) => [q.id, choiceOrder(q)])),

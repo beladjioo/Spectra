@@ -349,14 +349,39 @@ export const STR = {
       fr: "Basé sur le programme français (ANFR) — harmonisé HAREC.",
       en: "Based on the French (ANFR) syllabus — HAREC-harmonised.",
     },
+    prepTitle: { fr: "Prépa complète", en: "Full prep pack" },
+    prepPitch: {
+      fr: "Une banque de questions bien plus large que les {n} questions gratuites, pour s'entraîner jusqu'au jour J : chaque examen blanc est tiré au sort, et chaque réponse est expliquée. Achat unique, sans abonnement.",
+      en: "A much larger question bank than the {n} free ones, to practise until exam day: every mock exam is drawn at random, every answer explained. One-off purchase, no subscription.",
+    },
+    prepBuy: { fr: "Acheter la prépa", en: "Buy the pack" },
+    prepHaveKey: { fr: "Déjà acheté ? Colle ta clé de licence :", en: "Already bought? Paste your license key:" },
+    prepKeyPlaceholder: { fr: "Clé de licence", en: "License key" },
+    prepUnlock: { fr: "Débloquer", en: "Unlock" },
+    prepBadKey: {
+      fr: "Clé refusée. Vérifie-la dans l'e-mail de confirmation d'achat.",
+      en: "Key refused. Check it in your purchase confirmation email.",
+    },
+    prepDown: {
+      fr: "Service momentanément indisponible, réessaie dans un instant.",
+      en: "Service temporarily unavailable, try again shortly.",
+    },
+    prepUnlocked: {
+      fr: "Prépa complète débloquée : {n} questions de plus dans la révision et les examens blancs.",
+      en: "Full prep unlocked: {n} more questions in practice and mock exams.",
+    },
+    prepFree: {
+      fr: "Le reste d'OpenHertz reste gratuit : missions, bibliothèque, pilotage SDR.",
+      en: "The rest of OpenHertz stays free: missions, library, SDR control.",
+    },
   },
 
   support: {
     cta: { fr: "Soutenir", en: "Support" },
     title: { fr: "Un outil libre, financé par vous", en: "A free tool, funded by you" },
     body1: {
-      fr: "OpenHertz est entièrement gratuit : missions, examen blanc, bibliothèque, pilotage SDR — tout, pour tout le monde, sans compte ni clé.",
-      en: "OpenHertz is completely free: missions, mock exam, library, SDR control — everything, for everyone, no account, no key.",
+      fr: "Le cœur d'OpenHertz est gratuit et le restera : missions, examen blanc, bibliothèque, pilotage SDR — pour tout le monde, sans compte.",
+      en: "OpenHertz's core is free and will stay free: missions, mock exam, library, SDR control — for everyone, no account.",
     },
     body2: {
       fr: "Si l'outil t'apprend quelque chose, tu peux financer son développement du prix d'un café. Chaque don paie de nouveaux chapitres, décodeurs et fonctionnalités.",
@@ -364,7 +389,7 @@ export const STR = {
     },
     donate: { fr: "Faire un don sur Ko-fi", en: "Donate on Ko-fi" },
     star: { fr: "Étoile sur GitHub", en: "Star on GitHub" },
-    free: { fr: "100 % gratuit · open source · réception seule", en: "100% free · open source · receive-only" },
+    free: { fr: "Gratuit · open source · réception seule", en: "Free · open source · receive-only" },
     later: { fr: "plus tard", en: "later" },
   },
 

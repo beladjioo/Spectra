@@ -19,6 +19,18 @@
   },
   // product events (mission_started/completed, sdr_connected, note_read, …)
   "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "openhertz_events" }],
+  // Paid exam prep (/api/prep/*) — dormant until all of these exist; the app
+  // hides the pack meanwhile. To switch it on (see docs/prep-payante.md):
+  //   npx wrangler kv namespace create PREP        → paste the id below
+  //   npx wrangler secret put PREP_SIGNING_KEY     → any long random string
+  //   npx wrangler kv key put --binding PREP bank:v1 --path <private bank.json> --remote
+  // "kv_namespaces": [{ "binding": "PREP", "id": "<id>" }],
+  // "vars": {
+  //   "POLAR_ORG_ID": "<Polar organization id>",
+  //   "POLAR_BENEFIT_ID": "<license-key benefit id>",
+  //   "PREP_CHECKOUT_URL": "<Polar checkout link>",
+  //   "PREP_PRICE": "19 €"
+  // },
   // Workers Logs: requests/errors visible in the Cloudflare dashboard
   "observability": { "enabled": true, "head_sampling_rate": 1 },
 

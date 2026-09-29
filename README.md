@@ -2,7 +2,7 @@
 
 [![Try it live](https://img.shields.io/badge/try%20it-openhertz.org-2ea043)](https://openhertz.org)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![100% free](https://img.shields.io/badge/100%25-free%20%26%20open%20source-orange)](#license)
+[![free and open source](https://img.shields.io/badge/free-%26%20open%20source-orange)](#license)
 [![Receive-only](https://img.shields.io/badge/RF-receive--only-lightgrey)](#)
 
 > A gamified "SDR handbook": plug in an **RTL-SDR (~$30)** or a **HackRF**, or use
@@ -12,9 +12,11 @@
 > All-**Rust** DSP engine; React UI; a bilingual (EN/FR) Obsidian-style library;
 > built-in **amateur-radio exam** preparation.
 
-**100% free and open source.** Passive, **receive-only** — the SDR only ever
-listens; nothing is transmitted. Development is funded entirely by voluntary
-[donations on Ko-fi](https://ko-fi.com/spectrarf).
+**Free and open source.** Passive, **receive-only** — the SDR only ever
+listens; nothing is transmitted. Development is funded by voluntary
+[donations on Ko-fi](https://ko-fi.com/spectrarf) and by an optional paid
+exam-prep pack (a larger question bank, served by the edge Worker — the code is
+here, the paid questions are not).
 
 👉 **Try it now — no install, no account: [openhertz.org](https://openhertz.org)**
 
